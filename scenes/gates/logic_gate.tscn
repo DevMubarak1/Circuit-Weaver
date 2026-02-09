@@ -1,0 +1,74 @@
+[gd_scene load_steps=6 format=3 uid="uid://c6gxufrxmgd5"]
+
+[ext_resource type="Script" path="res://scripts/logic_gate.gd" id="1_xyz"]
+
+[sub_resource type="RectangleShape2D" id="RectShape1"]
+size = Vector2(60, 60)
+
+[sub_resource type="RectangleShape2D" id="RectShape2"]
+size = Vector2(24, 24)
+
+[sub_resource type="RectangleShape2D" id="RectShape3"]
+size = Vector2(24, 24)
+
+[sub_resource type="RectangleShape2D" id="RectShape4"]
+size = Vector2(24, 24)
+
+[node name="LogicGate" type="Node2D"]
+script = ExtResource("1_xyz")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -35
+offset_top = -35
+offset_right = 35
+offset_bottom = 35
+color = Color(0.3, 0.5, 0.9, 1)
+z_index = 0
+
+[node name="Border" type="ColorRect" parent="."]
+offset_left = -37
+offset_top = -37
+offset_right = 37
+offset_bottom = 37
+color = Color(0, 0, 0, 0)
+z_index = -1
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+modulate = Color.WHITE
+scale = Vector2(1.25, 1.25)
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectShape1")
+
+[node name="InputPorts" type="Node2D" parent="."]
+
+[node name="InputPort1" type="Area2D" parent="InputPorts"]
+position = Vector2(-30, -18)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InputPorts/InputPort1"]
+shape = SubResource("RectShape2")
+
+[node name="InputPort2" type="Area2D" parent="InputPorts"]
+position = Vector2(-30, 18)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InputPorts/InputPort2"]
+shape = SubResource("RectShape3")
+
+[node name="OutputPort" type="Area2D" parent="."]
+position = Vector2(30, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OutputPort"]
+shape = SubResource("RectShape4")
+
+[node name="Label" type="Label" parent="."]
+offset_left = -20
+offset_top = -12
+offset_right = 20
+offset_bottom = 12
+text = "AND"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color.WHITE
