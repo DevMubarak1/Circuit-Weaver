@@ -66,4 +66,4 @@ Check out [learn.md](learn.md) for a plain-language walkthrough of every logic g
 
 ## License
 
-Educational project. Built for learning.
+This project is licensed under the [MIT License](LICENSE).
