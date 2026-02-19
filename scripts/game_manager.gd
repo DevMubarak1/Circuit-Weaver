@@ -109,7 +109,8 @@ func setup_levels() -> void:
 func setup_ui() -> void:
 	"""Set up UI elements."""
 	# Find UIManager in the scene
-	ui_manager = get_node_or_null("CanvasLayer/UIManager")
+	var ui_node = get_node_or_null("CanvasLayer/UIManager")
+	ui_manager = ui_node as UIManager
 	if ui_manager:
 		ui_manager.run_simulation.connect(_on_run_button_pressed)
 		ui_manager.reset_level.connect(_on_reset_button_pressed)
@@ -161,8 +162,6 @@ func load_level(level_index: int) -> void:
 			first_target = output_data.target[0]
 	
 	if ui_manager:
-		print("🎮 Setting level info: %s" % level.name)
-		print("   Allowed gates: %s" % str(level.allowed_gates))
 		ui_manager.set_level_info(level.name, level.description, level.allowed_gates, first_target)
 		
 		# Connect output node signals to UI

@@ -1,54 +1,14 @@
-[gd_scene load_steps=3 format=3 uid="uid://ba7h2x6wj1b2"]
+[gd_scene load_steps=2 format=3 uid="uid://b1qwpfy6ewh7m"]
 
-[ext_resource type="Script" path="res://scripts/output_node.gd" id="1_output"]
+[ext_resource type="Script" uid="uid://rdyytlwfs40k" path="res://scripts/output_node.gd" id="1_lb8t5"]
 
-[sub_resource type="RectangleShape2D" id="RectShape1"]
-size = Vector2(48, 48)
-
-[sub_resource type="RectangleShape2D" id="RectShape2"]
-size = Vector2(20, 20)
-
-[node name="OutputNode" type="Node2D"]
-script = ExtResource("1_output")
-
-[node name="Background" type="ColorRect" parent="."]
-offset_left = -28
-offset_top = -28
-offset_right = 28
-offset_bottom = 28
-color = Color(1, 1, 0.2, 0.95)
-z_index = 0
-
-[node name="Sprite2D" type="Sprite2D" parent="."]
-modulate = Color.WHITE
-scale = Vector2(1.0, 1.0)
-
-[node name="Area2D" type="Area2D" parent="."]
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-shape = SubResource("RectShape1")
-
-[node name="InputPort" type="Area2D" parent="."]
-position = Vector2(-25, 0)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InputPort"]
-shape = SubResource("RectShape2")
-
-[node name="Indicator" type="ColorRect" parent="."]
-offset_left = -20
-offset_top = -20
-offset_right = 20
-offset_bottom = 20
-mouse_filter = 2
-color = Color(0, 0, 0, 0.5)
+[node name="output_node_tscn" type="Area2D"]
+script = ExtResource("1_lb8t5")
 
 [node name="Label" type="Label" parent="."]
-offset_left = -20
-offset_top = -12
-offset_right = 20
-offset_bottom = 12
-text = "OUT"
-horizontal_alignment = 1
-vertical_alignment = 1
-add_theme_font_size_override = 14
-add_theme_color_override font_color = Color.BLACK
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]

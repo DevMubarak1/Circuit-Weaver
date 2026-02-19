@@ -1,0 +1,110 @@
+[gd_scene load_steps=3 format=3 uid="uid://c5xu61wfr3pof"]
+
+[ext_resource type="Script" path="res://scripts/user_profile.gd" id="1_profile"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_neon"]
+bg_color = Color(0.0705882, 0.0862745, 0.113725, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 0.960784, 1, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0.960784, 1, 0.117647)
+shadow_size = 20
+
+[node name="UserProfile" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_profile")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0431373, 0.054902, 0.0784314, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainPanel" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(450, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_neon")
+
+[node name="Margins" type="MarginContainer" parent="Center/MainPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="VBox" type="VBoxContainer" parent="Center/MainPanel/Margins"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="Title" type="Label" parent="Center/MainPanel/Margins/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.960784, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "ARCHITECT INITIALIZATION"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Center/MainPanel/Margins/VBox"]
+layout_mode = 2
+
+[node name="NameSection" type="VBoxContainer" parent="Center/MainPanel/Margins/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="Center/MainPanel/Margins/VBox/NameSection"]
+layout_mode = 2
+text = "IDENTIFICATION TAG"
+
+[node name="NameEdit" type="LineEdit" parent="Center/MainPanel/Margins/VBox/NameSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+placeholder_text = "Enter Name..."
+alignment = 1
+
+[node name="AgeSection" type="VBoxContainer" parent="Center/MainPanel/Margins/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="Center/MainPanel/Margins/VBox/AgeSection"]
+layout_mode = 2
+text = "BIOLOGICAL CYCLE (AGE)"
+
+[node name="AgeSpin" type="SpinBox" parent="Center/MainPanel/Margins/VBox/AgeSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+min_value = 1.0
+value = 18.0
+alignment = 1
+
+[node name="Spacer" type="Control" parent="Center/MainPanel/Margins/VBox"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="Button" type="Button" parent="Center/MainPanel/Margins/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 55)
+layout_mode = 2
+text = "ESTABLISH CONNECTION"

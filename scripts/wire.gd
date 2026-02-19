@@ -2,104 +2,159 @@
 extends Node2D
 class_name Wire
 
-var from_port: Node2D  # The output port we're connecting from
-var to_port: Node2D   # The input port we're connecting to
-var from_gate: Node   # Reference to source gate/input node
-var to_gate: Node     # Reference to destination gate/output node
+var from_port: Node2D
+var to_port: Node2D
+var from_gate: Node
+var to_gate: Node
 var is_flowing: bool = false
-var current_signal: int = 0  # Current signal value being transmitted
+var current_signal: int = 0
 var line: Line2D
+var glow_line: Line2D
 var is_animating: bool = false
 var animation_progress: float = 0.0
+var _shader_material: ShaderMaterial = null
 
 signal signal_transmitted(value: int)
 
 func _ready() -> void:
 	line = get_node_or_null("Line2D")
+	if not line:
+		line = Line2D.new()
+		line.name = "Line2D"
+		line.width = 2.0
+		line.default_color = ThemeManager.SIGNAL_INACTIVE
+		line.z_index = -1
+		add_child(line)
+
+	glow_line = Line2D.new()
+	glow_line.name = "GlowLine"
+	glow_line.width = 10.0
+	glow_line.default_color = Color(0, 0, 0, 0)
+	glow_line.z_index = -2
+	add_child(glow_line)
+
+	var shader_res = load("res://shaders/wire_pulse.gdshader")
+	if shader_res:
+		_shader_material = ShaderMaterial.new()
+		_shader_material.shader = shader_res
+		_shader_material.set_shader_parameter("is_active", false)
+		line.material = _shader_material
+
 	if from_port and to_port:
 		update_line()
-	set_process(false)  # Start disabled, enable during simulation
+	set_process(true)
 
 func _process(delta: float) -> void:
 	update_line()
 	update_animation(delta)
 
 func update_line() -> void:
-	"""Update the visual line between ports."""
 	if not line:
 		line = get_node_or_null("Line2D")
-	
+
 	if line and from_port and to_port:
 		line.clear_points()
-		line.add_point(from_port.global_position)
-		
-		# Add a curve for visual appeal
-		var mid_point = from_port.global_position.lerp(to_port.global_position, 0.5)
-		mid_point.y -= 20
-		
-		line.add_point(mid_point)
-		line.add_point(to_port.global_position)
-		
-		# Color based on signal value
+		if glow_line:
+			glow_line.clear_points()
+		var start: Vector2 = to_local(from_port.global_position)
+		var end_pt: Vector2 = to_local(to_port.global_position)
+		var mid_x: float = (start.x + end_pt.x) / 2.0
+
+		var points: Array[Vector2] = [
+			start,
+			Vector2(mid_x, start.y),
+			Vector2(mid_x, end_pt.y),
+			end_pt,
+		]
+		for pt in points:
+			line.add_point(pt)
+			if glow_line:
+				glow_line.add_point(pt)
+
+		# Color based on signal state
 		if is_flowing:
-			line.default_color = Color.GREEN if current_signal == 1 else Color.RED
+			var active_col: Color = ThemeManager.SIGNAL_ACTIVE if current_signal == 1 else ThemeManager.ACCENT_WARNING
+			line.default_color = active_col
 			line.width = 4.0
+			if glow_line:
+				glow_line.default_color = Color(active_col.r, active_col.g, active_col.b, 0.25)
+				glow_line.width = 14.0
+			_set_shader_active(true, active_col)
 		elif is_animating:
-			line.default_color = Color.CYAN
+			line.default_color = ThemeManager.SIGNAL_ACTIVE
 			line.width = 3.0
+			if glow_line:
+				glow_line.default_color = Color(ThemeManager.SIGNAL_ACTIVE.r, ThemeManager.SIGNAL_ACTIVE.g, ThemeManager.SIGNAL_ACTIVE.b, 0.15)
+				glow_line.width = 12.0
+			_set_shader_active(true, ThemeManager.SIGNAL_ACTIVE)
 		else:
-			line.default_color = Color(0.4, 0.8, 0.9, 0.7)
+			line.default_color = ThemeManager.SIGNAL_INACTIVE
 			line.width = 2.0
+			if glow_line:
+				glow_line.default_color = Color(0, 0, 0, 0)
+				glow_line.width = 0.0
+			_set_shader_active(false, ThemeManager.SIGNAL_INACTIVE)
+
+func _set_shader_active(active: bool, color: Color) -> void:
+	if _shader_material:
+		_shader_material.set_shader_parameter("is_active", active)
+		_shader_material.set_shader_parameter("active_color", color)
 
 func connect_ports(source_port: Node2D, source_gate: Node, dest_port: Node2D, dest_gate: Node) -> void:
-	"""Set up the connection between two ports."""
 	from_port = source_port
 	from_gate = source_gate
 	to_port = dest_port
 	to_gate = dest_gate
-	
-	# Store reference to port for tracking
+
+	if not line:
+		line = Line2D.new()
+		line.name = "Line2D"
+		line.width = 2.0
+		line.default_color = ThemeManager.SIGNAL_INACTIVE
+		line.z_index = -1
+		add_child(line)
+
+	update_line()
+
 	if from_port:
 		from_port.set_meta("connected_wire", self)
 	if to_port:
 		to_port.set_meta("connected_wire", self)
 
 func transmit_signal(value: int) -> void:
-	"""Transmit a signal through this wire."""
 	current_signal = value
 	is_flowing = true
 	is_animating = true
 	animation_progress = 0.0
 	set_process(true)
-	
 	signal_transmitted.emit(value)
 
 func receive_at_destination() -> void:
-	"""Called when signal reaches the destination."""
 	if to_gate:
 		if to_gate is LogicGate:
-			to_gate.add_input(current_signal)
+			var port_idx: int = 0
+			if to_port and to_port.has_meta("port_index"):
+				port_idx = to_port.get_meta("port_index")
+			to_gate.add_input(current_signal, port_idx)
 		elif to_gate is OutputNode:
 			to_gate.receive_input(current_signal)
 
 func update_animation(delta: float) -> void:
-	"""Update signal flow animation."""
 	if is_animating:
-		animation_progress += delta * 3.0  # 3.0 = animation speed
-		
+		animation_progress += delta * 3.0
 		if animation_progress >= 1.0:
 			is_animating = false
 			is_flowing = false
 			animation_progress = 1.0
-			set_process(false)
+			# NOTE: Do NOT call set_process(false) here — update_line() must
+			# keep running so wires redraw when gates are dragged.
 
 func get_signal_value() -> int:
-	"""Get the current signal value being transmitted."""
 	return current_signal
 
 func stop_flowing() -> void:
-	"""Stop the signal flow animation."""
 	is_animating = false
 	is_flowing = false
 	animation_progress = 0.0
-	set_process(false)
+	_set_shader_active(false, ThemeManager.SIGNAL_INACTIVE)
+	# Keep set_process(true) so update_line() continues for dragging

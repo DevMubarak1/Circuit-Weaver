@@ -1,0 +1,84 @@
+# ===== Godot 4 =====
+
+# Godot-generated internal data (editor state, imported assets, caches)
+.godot/
+
+# Auto-generated import metadata (recreated when Godot opens the project)
+*.import
+
+# Auto-generated UID files (recreated by Godot on project load)
+*.uid
+
+# Godot resource/scene binary caches
+*.translation
+*.stex
+*.ctex
+
+# ===== Godot Exports =====
+# Build outputs and export templates
+*.exe
+*.x86_64
+*.x86_32
+*.apk
+*.aab
+*.pck
+*.zip
+
+# Export presets (may contain signing keys / passwords)
+export_presets.cfg
+export_presets.cfg.backup
+
+# ===== OS Junk =====
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.Trash-*
+
+# ===== Editors & IDEs =====
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains (Rider, IntelliJ)
+.idea/
+*.iml
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+
+
+# ===== Logs & Temp =====
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+*.psd
+*.xcf
+*.blend
+*.blend1
+*.kra
+./update-git.bat

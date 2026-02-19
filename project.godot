@@ -12,11 +12,26 @@ config_version=5
 
 config/name="Circuit Weaver"
 config/version="0.1.0"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/intro.tscn"
 config/features=PackedStringArray("4.5")
 config/icon="res://assets/icon.svg"
+
+[autoload]
+
+Global="*res://scripts/Global.gd"
+TransitionMgr="*res://scripts/transition_manager.gd"
+SFXManager="*res://scripts/sfx_manager.gd"
+MusicManager="*res://scripts/music_manager.gd"
+ResponsiveManager="*res://scripts/responsive_manager.gd"
+AnimHelper="*res://scripts/anim_helper.gd"
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true

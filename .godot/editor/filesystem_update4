@@ -1,2 +1,12 @@
 res://scripts/circuit_board.gd
-res://scripts/logic_gate.gd
+res://scripts/wire.gd
+res://scripts/gate_icon.gd
+res://scripts/responsive_manager.gd
+res://scripts/Global.gd
+res://scripts/intro_scene.gd
+res://scripts/level_manager.gd
+res://scripts/level_select.gd
+res://scripts/user_profile.gd
+res://scripts/anim_helper.gd
+res://scripts/level_config.gd
+res://scripts/music_manager.gd

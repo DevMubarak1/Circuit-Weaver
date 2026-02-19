@@ -10,6 +10,7 @@ var level_status_label: Label
 var objective_label: Label
 var gate_buttons: Dictionary = {}  # gate_type -> Button
 var game_manager: GameManager
+var gate_toolbox: GateToolbox
 
 # UI State
 var current_allowed_gates: Array[String] = []
@@ -24,13 +25,15 @@ func _ready() -> void:
 	await get_tree().process_frame
 	game_manager = get_node_or_null("/root/Main")
 	create_ui()
+	setup_gate_toolbox()
 
 func create_ui() -> void:
-	"""Build the complete UI with modern styling."""
-	# Color scheme
-	var bg_color = Color(0.15, 0.15, 0.15, 0.95)
-	var accent_color = Color(0.2, 0.6, 1.0, 1.0)
-	var success_color = Color(0.2, 1.0, 0.4, 1.0)
+	"""Build the complete UI with Midnight Architect theme."""
+	# Use Midnight Architect palette from ThemeManager
+	var bg_color = ThemeManager.MIDNIGHT_BG
+	var signal_active = ThemeManager.SIGNAL_ACTIVE
+	var _success_color = ThemeManager.GATE_OR_GREEN
+	var accent_color: Color = ThemeManager.SIGNAL_ACTIVE # Electric Cyan for accent
 	
 	# ============ RIGHT SIDE PANEL ============
 	var right_panel = PanelContainer.new()
@@ -43,10 +46,10 @@ func create_ui() -> void:
 	right_panel.offset_top = 0
 	right_panel.offset_bottom = 0
 	
-	# Panel styling
+	# Panel styling with Midnight Architect theme
 	var panel_style = StyleBoxFlat.new()
 	panel_style.bg_color = bg_color
-	panel_style.border_color = accent_color
+	panel_style.border_color = signal_active  # Electric cyan border for glow
 	panel_style.border_width_left = 3
 	panel_style.border_width_right = 3
 	panel_style.border_width_top = 3
@@ -72,16 +75,15 @@ func create_ui() -> void:
 	
 	# ============ HEADER ============
 	var header_label = Label.new()
-	header_label.text = "⚙ CIRCUIT WEAVER"
-	header_label.add_theme_font_size_override("font_size", 18)
-	header_label.add_theme_color_override("font_color", accent_color)
+	header_label.text = "CIRCUIT WEAVER"
+	# Apply header styling with Midnight Architect electric cyan
+	ThemeManager.apply_header_style(header_label, ThemeManager.SIGNAL_ACTIVE)
 	content_vbox.add_child(header_label)
 	
 	# Level progress
 	level_status_label = Label.new()
 	level_status_label.text = "Level 1 / 4"
-	level_status_label.add_theme_font_size_override("font_size", 12)
-	level_status_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	ThemeManager.apply_body_style(level_status_label, ThemeManager.TERMINAL_WHITE)
 	content_vbox.add_child(level_status_label)
 	
 	# Separator
@@ -90,43 +92,93 @@ func create_ui() -> void:
 	
 	# ============ OBJECTIVE SECTION ============
 	var obj_title = Label.new()
-	obj_title.text = "📋 OBJECTIVE"
-	obj_title.add_theme_font_size_override("font_size", 13)
-	obj_title.add_theme_color_override("font_color", accent_color)
+	obj_title.text = "OBJECTIVE"
+	# Apply header styling with Midnight Architect emerald green
+	ThemeManager.apply_header_style(obj_title, ThemeManager.GATE_OR_GREEN)
 	content_vbox.add_child(obj_title)
 	
 	objective_label = Label.new()
 	objective_label.text = "Build your circuit here"
 	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	objective_label.custom_minimum_size = Vector2(280, 60)
-	objective_label.add_theme_font_size_override("font_size", 11)
+	ThemeManager.apply_body_style(objective_label, ThemeManager.TERMINAL_WHITE)
 	content_vbox.add_child(objective_label)
 	
 	# ============ GATES SECTION ============
 	var gates_title = Label.new()
-	gates_title.text = "🔧 AVAILABLE GATES"
+	gates_title.text = "AVAILABLE GATES"
 	gates_title.add_theme_font_size_override("font_size", 13)
 	gates_title.add_theme_color_override("font_color", accent_color)
 	content_vbox.add_child(gates_title)
 	
-	# Gate buttons grid
+	var gates_info = Label.new()
+	gates_info.text = "Drag gates to circuit board"
+	gates_info.add_theme_font_size_override("font_size", 10)
+	gates_info.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	content_vbox.add_child(gates_info)
+	
+	# Gate buttons grid with TextureButtons and icons
 	gate_buttons_container = GridContainer.new()
 	gate_buttons_container.columns = 2
 	gate_buttons_container.add_theme_constant_override("h_separation", 8)
 	gate_buttons_container.add_theme_constant_override("v_separation", 8)
 	content_vbox.add_child(gate_buttons_container)
 	
-	# Create gate buttons (will be filtered by set_level_info)
+	# Create gate TextureButtons with SVG icons (will be filtered by set_level_info)
 	var all_gates = ["AND", "OR", "NOT", "XOR", "NAND", "NOR", "XNOR"]
+	var gate_icon_paths = {
+		"AND": "res://assets/AND_ANSI.svg",
+		"OR": "res://assets/OR_ANSI.svg",
+		"NOT": "res://assets/NOT_ANSI.svg",
+		"XOR": "res://assets/XOR_ANSI.svg",
+		"NAND": "res://assets/NAND_ANSI.svg",
+		"NOR": "res://assets/NOR_ANSI.svg",
+		"XNOR": "res://assets/XNOR_ANSI.svg"
+	}
+	
 	for gate in all_gates:
-		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(130, 40)
-		btn.text = gate
-		btn.add_theme_font_size_override("font_size", 11)
+		# Container for gate label and button
+		var gate_item = VBoxContainer.new()
+		gate_item.add_theme_constant_override("separation", 0)
+		
+		# Label above button
+		var label = Label.new()
+		label.text = gate
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 11)
+		label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		label.custom_minimum_size = Vector2(130, 16)  # Match button width for proper centering
+		gate_item.add_child(label)
+		
+		# TextureButton with SVG icon
+		var btn = TextureButton.new()
+		btn.custom_minimum_size = Vector2(130, 100)
+		# Godot 4: TextureButton does not have expand_mode. Remove or set stretch_mode if needed.
+		# btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED  # Optional, or remove line
+		
+		# Load SVG texture
+		var icon_path = gate_icon_paths.get(gate)
+		if icon_path and ResourceLoader.exists(icon_path):
+			var texture = load(icon_path)
+			if texture:
+				btn.texture_normal = texture
+		
+		btn.modulate = Color.WHITE
+		btn.name = "GateButton_%s" % gate
+		btn.set_meta("gate_type", gate)
+		btn.tooltip_text = "Drag %s gate to circuit board" % gate
 		btn.pressed.connect(_on_gate_button_pressed.bind(gate))
+		
+		# Setup button drag detection signals
+		btn.button_down.connect(func(): _on_gate_button_down(btn, gate))
+		btn.button_up.connect(func(): _on_gate_button_up(gate))
+		
 		btn.disabled = true  # Start disabled, enabled based on level
+		
+		gate_item.add_child(btn)
+		
 		gate_buttons[gate] = btn
-		gate_buttons_container.add_child(btn)
+		gate_buttons_container.add_child(gate_item)
 	
 	# Separator
 	var sep2 = HSeparator.new()
@@ -134,7 +186,7 @@ func create_ui() -> void:
 	
 	# ============ CONTROLS SECTION ============
 	var controls_title = Label.new()
-	controls_title.text = "🎮 CONTROLS"
+	controls_title.text = "CONTROLS"
 	controls_title.add_theme_font_size_override("font_size", 13)
 	controls_title.add_theme_color_override("font_color", accent_color)
 	content_vbox.add_child(controls_title)
@@ -143,12 +195,11 @@ func create_ui() -> void:
 	simulation_controls.add_theme_constant_override("separation", 8)
 	content_vbox.add_child(simulation_controls)
 	
-	# Run button
+	# Run button - apply digital frontier style with success color (emerald green)
 	var run_btn = Button.new()
-	run_btn.text = "▶ RUN"
+	run_btn.text = "> RUN"
 	run_btn.custom_minimum_size = Vector2(140, 45)
-	run_btn.add_theme_font_size_override("font_size", 12)
-	run_btn.add_theme_color_override("font_color", success_color)
+	ThemeManager.apply_button_style(run_btn, ThemeManager.GATE_OR_GREEN)
 	var run_style = StyleBoxFlat.new()
 	run_style.bg_color = Color(0.1, 0.4, 0.1, 0.8)
 	run_style.corner_radius_top_left = 6
@@ -166,11 +217,11 @@ func create_ui() -> void:
 	run_btn.pressed.connect(_on_run_pressed)
 	simulation_controls.add_child(run_btn)
 	
-	# Reset button
+	# Reset button - apply digital frontier style with Midnight Architect orange
 	var reset_btn = Button.new()
 	reset_btn.text = "⟲ RESET"
 	reset_btn.custom_minimum_size = Vector2(140, 45)
-	reset_btn.add_theme_font_size_override("font_size", 12)
+	ThemeManager.apply_button_style(reset_btn, ThemeManager.GATE_NOR_ORANGE)
 	var reset_style = StyleBoxFlat.new()
 	reset_style.bg_color = Color(0.4, 0.3, 0.1, 0.8)
 	reset_style.corner_radius_top_left = 6
@@ -193,7 +244,7 @@ func create_ui() -> void:
 	content_vbox.add_child(sep_output)
 	
 	var output_title = Label.new()
-	output_title.text = "📊 OUTPUT"
+	output_title.text = "OUTPUT"
 	output_title.add_theme_font_size_override("font_size", 13)
 	output_title.add_theme_color_override("font_color", accent_color)
 	content_vbox.add_child(output_title)
@@ -289,6 +340,30 @@ func set_level_info(level_name: String, description: String, allowed_gates: Arra
 				style.set(corner, 4)
 			btn.add_theme_stylebox_override("normal", style)
 
+func setup_gate_toolbox() -> void:
+	"""Initialize the GateToolbox with drag-and-drop support."""
+	# Create the GateToolbox instance
+	gate_toolbox = GateToolbox.new()
+	gate_toolbox.setup(game_manager)
+	add_child(gate_toolbox)
+	
+	# Connect toolbox signals to gate placement handler
+	gate_toolbox.gate_placement_requested.connect(_on_toolbox_gate_placed)
+	gate_toolbox.set_process_input(true)
+	gate_toolbox.mouse_filter = Control.MOUSE_FILTER_PASS
+
+func _on_toolbox_gate_placed(gate_type: String, world_pos: Vector2) -> void:
+	"""Handle gate placement from toolbox drag-and-drop."""
+	if gate_type not in current_allowed_gates:
+		return
+	
+	if not game_manager or not game_manager.circuit_board:
+		return
+	
+	# Place gate directly at the world position where mouse was
+	var circuit_board = game_manager.circuit_board
+	var new_gate = circuit_board.place_gate(gate_type, Vector2i.ZERO, world_pos)
+
 func _on_gate_button_pressed(gate_type: String) -> void:
 	"""Handle gate button press."""
 	if gate_type not in current_allowed_gates:
@@ -296,26 +371,30 @@ func _on_gate_button_pressed(gate_type: String) -> void:
 	
 	selected_gate = gate_type
 	gate_selected.emit(gate_type)
-	
-	if game_manager and game_manager.circuit_board:
-		var new_gate = game_manager.circuit_board.place_gate(gate_type, Vector2i(8, 5))
-		if new_gate:
-			print("📍 Placed %s gate" % gate_type)
+
+func _on_gate_button_down(btn: TextureButton, gate_type: String) -> void:
+	"""Handle gate button press down (start drag detection)."""
+	if gate_toolbox:
+		gate_toolbox._on_gate_button_down(btn, gate_type)
+
+func _on_gate_button_up(_gate_type: String) -> void:
+	"""Handle gate button release (end drag or click)."""
+	# Check if it was a drag or just a click
+	if gate_toolbox:
+		# Instead of sending an abstract InputEvent, call a cleanup method directly
+		gate_toolbox._cleanup_drag()
 
 func _on_run_pressed() -> void:
 	"""Handle run button."""
 	run_simulation.emit()
-	print("▶ Running simulation...")
 
 func _on_reset_pressed() -> void:
 	"""Handle reset button."""
 	reset_level.emit()
-	print("⟲ Resetting level...")
 
 func show_level_complete(level_name: String) -> void:
 	"""Show completion message."""
 	level_complete = true
-	print("✓ Level Complete: %s" % level_name)
 	# Can add animation/sound here later
 
 func update_wiring_status(_is_wiring: bool) -> void:

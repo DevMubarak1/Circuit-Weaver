@@ -1,0 +1,116 @@
+[gd_scene load_steps=4 format=3 uid="uid://draxam4np4g5"]
+
+[ext_resource type="Script" path="res://scripts/level_manager.gd" id="1_level_manager"]
+[ext_resource type="Script" path="res://scripts/circuit_board.gd" id="2_circuit_board"]
+[ext_resource type="Script" path="res://scripts/board_drop_zone.gd" id="3_drop_zone"]
+
+[sub_resource type="Environment" id="env_glow"]
+background_mode = 1
+ambient_light_source = 0
+ambient_light_energy = 0.5
+glow_enabled = true
+glow_intensity = 1.2
+glow_strength = 1.1
+glow_bloom = 0.3
+glow_blend_mode = 0
+glow_hdr_threshold = 0.8
+glow_hdr_scale = 2.5
+glow_hdr_luminance_cap = 12.0
+
+[node name="LevelRoot" type="Node2D"]
+script = ExtResource("1_level_manager")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env_glow")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(500, 300)
+
+[node name="CircuitBoard" type="Node2D" parent="."]
+position = Vector2(400, 0)
+script = ExtResource("2_circuit_board")
+
+[node name="Background" type="ColorRect" parent="CircuitBoard"]
+z_index = -10
+offset_left = -2000.0
+offset_top = -2000.0
+offset_right = 3000.0
+offset_bottom = 3000.0
+color = Color(0.043, 0.055, 0.078, 1)
+
+[node name="GatesContainer" type="Node2D" parent="CircuitBoard"]
+
+[node name="WiresContainer" type="Node2D" parent="CircuitBoard"]
+
+[node name="InputContainer" type="Node2D" parent="CircuitBoard"]
+
+[node name="OutputContainer" type="Node2D" parent="CircuitBoard"]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="MainUI" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/MainUI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="Sidebar" type="PanelContainer" parent="CanvasLayer/MainUI/HBoxContainer"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+
+[node name="SidebarMargin" type="MarginContainer" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="SidebarVBox" type="VBoxContainer" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderLabel" type="Label" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox"]
+layout_mode = 2
+text = "ARCHITECT PROFILE"
+horizontal_alignment = 1
+
+[node name="WelcomeLabel" type="Label" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox"]
+layout_mode = 2
+text = "Welcome, Guest"
+horizontal_alignment = 1
+custom_minimum_size = Vector2(0, 40)
+
+[node name="HSeparator1" type="HSeparator" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox"]
+layout_mode = 2
+
+[node name="ToolboxTitle" type="Label" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox"]
+layout_mode = 2
+text = "GATE TOOLBOX"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GateToolbox" type="VBoxContainer" parent="CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="BoardArea" type="Control" parent="CanvasLayer/MainUI/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 0
+script = ExtResource("3_drop_zone")

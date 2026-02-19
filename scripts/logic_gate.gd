@@ -1,5 +1,5 @@
 # Base class for all logic gates
-extends Node2D
+extends Area2D
 class_name LogicGate
 
 signal output_changed(value: int)
@@ -11,44 +11,113 @@ signal gate_activated
 var input_slots: Dictionary = {}  # Maps input_index -> value
 var output_value: int = 0
 var is_hovering: bool = false
-var sprite: Sprite2D
+@onready var sprite: Sprite2D = $Sprite2D
 var input_ports: Node2D
 var output_port: Area2D
 var connected_output_wires: Array[Wire] = []
+var _propagation_depth: int = 0
+const MAX_PROPAGATION_DEPTH: int = 50
 var background: ColorRect
+var gate_body: Area2D  # Reference to collision body
 
 func _ready() -> void:
-	sprite = get_node_or_null("Sprite2D")
 	input_ports = get_node_or_null("InputPorts")
 	output_port = get_node_or_null("OutputPort")
-	background = get_node_or_null("Background")
+	gate_body = self  # Root node is Area2D
 	set_process_input(true)
-	
+	# Only reload icon if not already loaded (create_gate_instance may have loaded it)
+	if sprite and not sprite.texture:
+		load_gate_icon()
+	set_meta("gate_ref", self)
+
+func load_gate_icon() -> void:
+	if not sprite:
+		sprite = get_node_or_null("Sprite2D")
+		if not sprite:
+			return
+	var svg_path = _get_white_svg_path(gate_type)
+	if svg_path and ResourceLoader.exists(svg_path):
+		var texture = load(svg_path)
+		if texture:
+			sprite.texture = texture
+		else:
+			pass
+	else:
+		# Fallback to black SVG
+		var fallback = _get_black_svg_path(gate_type)
+		if fallback and ResourceLoader.exists(fallback):
+			sprite.texture = load(fallback)
+		else:
+			pass
+
+func _get_white_svg_path(gate: String) -> String:
+	match gate:
+		"AND":
+			return "res://assets/and-whiteansi.svg"
+		"OR":
+			return "res://assets/or-whiteansi.svg"
+		"NOT":
+			return "res://assets/not-whiteansi.svg"
+		"NAND":
+			return "res://assets/nand-whiteansi.svg"
+		"NOR":
+			return "res://assets/nor-whiteansi.svg"
+		"XOR":
+			return "res://assets/xor-whiteansi.svg"
+		"XNOR":
+			return "res://assets/xnor-whiteansi.svg"
+		_:
+			return "res://assets/and-whiteansi.svg"
+
+func _get_black_svg_path(gate: String) -> String:
+	match gate:
+		"AND":
+			return "res://assets/AND_ANSI.svg"
+		"OR":
+			return "res://assets/OR_ANSI.svg"
+		"NOT":
+			return "res://assets/NOT_ANSI.svg"
+		"NAND":
+			return "res://assets/NAND_ANSI.svg"
+		"NOR":
+			return "res://assets/NOR_ANSI.svg"
+		"XOR":
+			return "res://assets/XOR_ANSI.svg"
+		"XNOR":
+			return "res://assets/XNOR_ANSI.svg"
+		_:
+			return "res://assets/AND_ANSI.svg"
+
+
 func add_input(value: int, port_index: int = 0) -> void:
-	"""Add an input value to a specific input port."""
 	input_slots[port_index] = value
 	evaluate()
 
 func clear_inputs() -> void:
-	"""Clear all inputs for re-evaluation."""
 	input_slots.clear()
+	output_value = -1  # Sentinel so first evaluate() always propagates
 
 func evaluate() -> void:
-	"""Evaluate the gate based on current inputs and emit output if changed."""
 	var new_output = compute_output()
-	if new_output != output_value:
-		output_value = new_output
-		output_changed.emit(output_value)
-		gate_activated.emit()
-		propagate_output()
+	if new_output == output_value:
+		return  # No change — skip redundant propagation
+	output_value = new_output
+	output_changed.emit(output_value)
+	gate_activated.emit()
+	propagate_output()
 
 func propagate_output() -> void:
-	"""Send output to all connected wires."""
+	_propagation_depth += 1
+	if _propagation_depth > MAX_PROPAGATION_DEPTH:
+		push_warning("Circuit Weaver: Propagation depth exceeded — possible feedback loop in gate %s" % get_gate_id())
+		_propagation_depth = 0
+		return
 	for wire in connected_output_wires:
 		wire.transmit_signal(output_value)
+		wire.receive_at_destination()
+	_propagation_depth = 0
 
 func compute_output() -> int:
-	"""Override in subclasses. Compute output based on gate type and inputs."""
 	match gate_type:
 		"AND":
 			return compute_and()
@@ -68,32 +137,28 @@ func compute_output() -> int:
 			return 0
 
 func compute_and() -> int:
-	if input_slots.is_empty():
-		return 0
-	for value in input_slots.values():
-		if value == 0:
+	# Require both inputs present; missing inputs default to 0
+	for i in range(2):
+		if input_slots.get(i, 0) == 0:
 			return 0
 	return 1
 
 func compute_or() -> int:
-	if input_slots.is_empty():
-		return 0
-	for value in input_slots.values():
-		if value == 1:
+	# Check both inputs; missing inputs default to 0
+	for i in range(2):
+		if input_slots.get(i, 0) == 1:
 			return 1
 	return 0
 
 func compute_not() -> int:
-	if input_slots.is_empty():
-		return 1
-	return 1 - input_slots.get(0, 0)
+	# Use .get(0, 0) to avoid errors if port 0 isn't connected yet
+	return 1 if input_slots.get(0, 0) == 0 else 0
 
 func compute_xor() -> int:
-	if input_slots.is_empty():
-		return 0
+	# XOR over both inputs; missing inputs default to 0
 	var result = 0
-	for value in input_slots.values():
-		result = result ^ value
+	for i in range(2):
+		result = result ^ input_slots.get(i, 0)
 	return result
 
 func compute_nand() -> int:
@@ -106,40 +171,30 @@ func compute_xnor() -> int:
 	return 1 - compute_xor()
 
 func get_input_port_position(index: int) -> Vector2:
-	"""Return the world position of an input port."""
 	if input_ports and index < input_ports.get_child_count():
 		return input_ports.get_child(index).global_position
 	return global_position
 
 func get_gate_id() -> String:
-	"""Return a unique identifier for this gate instance."""
 	return "%s_%d" % [gate_type, get_instance_id()]
 
 func add_output_wire(wire: Wire) -> void:
-	"""Register a wire connected to this gate's output."""
 	if wire not in connected_output_wires:
 		connected_output_wires.append(wire)
 
 func highlight(color: Color) -> void:
-	"""Highlight the gate with a color."""
-	if background:
-		background.color = color
-	modulate = Color.WHITE
+	modulate = color
 
 func reset_highlight() -> void:
-	"""Reset the highlight to normal."""
 	modulate = Color.WHITE
 
 func is_fully_connected() -> bool:
-	"""Check if all input ports have connections."""
-	# Count how many inputs are needed
 	var required_inputs = 2
 	if gate_type == "NOT":
 		required_inputs = 1
 	return input_slots.size() >= required_inputs
 
 func get_output_port_position() -> Vector2:
-	"""Return the world position of the output port."""
 	if output_port:
 		return output_port.global_position
 	return global_position
