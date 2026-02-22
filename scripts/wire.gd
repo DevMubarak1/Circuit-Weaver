@@ -13,6 +13,8 @@ var glow_line: Line2D
 var is_animating: bool = false
 var animation_progress: float = 0.0
 var _shader_material: ShaderMaterial = null
+var _cached_start: Vector2 = Vector2.INF
+var _cached_end: Vector2 = Vector2.INF
 
 signal signal_transmitted(value: int)
 
@@ -45,10 +47,24 @@ func _ready() -> void:
 	set_process(true)
 
 func _process(delta: float) -> void:
-	update_line()
-	update_animation(delta)
+	# Only rebuild line when port positions actually change (gate dragged)
+	if from_port and to_port:
+		var s: Vector2 = from_port.global_position
+		var e: Vector2 = to_port.global_position
+		if s != _cached_start or e != _cached_end:
+			_cached_start = s
+			_cached_end = e
+			_rebuild_line()
+	if is_animating:
+		update_animation(delta)
 
 func update_line() -> void:
+	# Force a full line rebuild and cache update
+	_cached_start = Vector2.INF
+	_cached_end = Vector2.INF
+	_rebuild_line()
+
+func _rebuild_line() -> void:
 	if not line:
 		line = get_node_or_null("Line2D")
 

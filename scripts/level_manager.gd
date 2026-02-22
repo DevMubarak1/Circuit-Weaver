@@ -49,7 +49,28 @@ var _good_luck_active: bool = false
 var _good_luck_timer: Timer = null
 var _tutorial_complete: bool = false
 
+# Input blocking during tutorial
+var _input_blocked: bool = true
+
+# Failure panel
+var _level_failed_panel: PanelContainer = null
+var _level_failed_label: Label = null
+
+# Overlay panels
+var _hints_revealed: int = 0
+var _hint_panel: PanelContainer = null
+var _hint_btn: Button = null
+var _truth_table_panel: PanelContainer = null
+var _shortcuts_panel: PanelContainer = null
+
+# --- TAP-TO-PLACE (mobile) ---
+var _selected_gate_type: String = ""
+var _tap_place_label: Label = null
+var _sidebar_toggle_btn: Button = null
+var _sidebar_visible: bool = true
+
 func _ready() -> void:
+	add_to_group("level_manager")
 	current_level_id = Global.current_level
 	level_data = LevelConfig.get_level(current_level_id)
 	
@@ -94,8 +115,6 @@ func _ready() -> void:
 # --- LEVEL SETUP ---
 
 func setup_level() -> void:
-	var title = level_data.get("title", "Level %d" % current_level_id)
-	
 	var allowed: Array = level_data.get("allowed_gates", [])
 	var allowed_typed: Array[String] = []
 	for g in allowed:
@@ -157,25 +176,29 @@ func load_architect_profile() -> void:
 func apply_level_theme() -> void:
 	var resp = get_node_or_null("/root/ResponsiveManager")
 	var ui_scale: float = resp.ui_scale if resp else 1.0
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
 
 	var sidebar = get_node_or_null("CanvasLayer/MainUI/HBoxContainer/Sidebar") as PanelContainer
 	if sidebar:
-		var sidebar_style = ThemeManager.create_panel_style(
-			ThemeManager.SIGNAL_ACTIVE,
-			ThemeManager.MIDNIGHT_GRID
-		)
+		# Glassmorphic sidebar with chapter accent
+		var sidebar_style = ThemeManager.create_glass_panel(ch_accent, 0, 2)
+		sidebar_style.corner_radius_top_left = 0
+		sidebar_style.corner_radius_bottom_left = 0
+		sidebar_style.corner_radius_top_right = 12
+		sidebar_style.corner_radius_bottom_right = 12
 		sidebar.add_theme_stylebox_override("panel", sidebar_style)
 		var sw: float = resp.sidebar_width if resp else 250.0
 		sidebar.custom_minimum_size = Vector2(sw, 0)
 
-	header_label.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
+	header_label.add_theme_color_override("font_color", ch_accent)
 	header_label.add_theme_font_size_override("font_size", int(16 * ui_scale))
 	welcome_label.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
 	welcome_label.add_theme_font_size_override("font_size", int(12 * ui_scale))
 
 	var toolbox_title = get_node_or_null("CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin/SidebarVBox/ToolboxTitle") as Label
 	if toolbox_title:
-		toolbox_title.add_theme_color_override("font_color", ThemeManager.GATE_OR_GREEN)
+		toolbox_title.add_theme_color_override("font_color", ch_accent)
 		toolbox_title.add_theme_font_size_override("font_size", int(14 * ui_scale))
 
 	var sidebar_margin = get_node_or_null("CanvasLayer/MainUI/HBoxContainer/Sidebar/SidebarMargin") as MarginContainer
@@ -194,38 +217,66 @@ func setup_gate_toolbox(allowed_gates: Array[String]) -> void:
 	var icon_size: float = 60.0 * ui_scale
 
 	for gate_type in allowed_gates:
+		# Card-style gate item with colored accent
+		var card = PanelContainer.new()
+		card.name = gate_type + "Card"
+		var gate_color: Color = ThemeManager.get_gate_color(gate_type)
+		var card_style = StyleBoxFlat.new()
+		card_style.bg_color = Color(gate_color.r * 0.08, gate_color.g * 0.08, gate_color.b * 0.08, 0.6)
+		card_style.border_color = Color(gate_color.r * 0.4, gate_color.g * 0.4, gate_color.b * 0.4, 0.5)
+		card_style.border_width_left = 3
+		card_style.border_width_right = 1
+		card_style.border_width_top = 1
+		card_style.border_width_bottom = 1
+		ThemeManager._apply_radius(card_style, 8)
+		card_style.content_margin_left = int(6 * ui_scale)
+		card_style.content_margin_right = int(6 * ui_scale)
+		card_style.content_margin_top = int(4 * ui_scale)
+		card_style.content_margin_bottom = int(4 * ui_scale)
+		card_style.shadow_color = Color(gate_color.r * 0.15, gate_color.g * 0.15, gate_color.b * 0.15, 0.3)
+		card_style.shadow_size = 4
+		card.add_theme_stylebox_override("panel", card_style)
+
 		var wrapper = VBoxContainer.new()
 		wrapper.name = gate_type + "Wrapper"
 		wrapper.alignment = BoxContainer.ALIGNMENT_CENTER
 		wrapper.add_theme_constant_override("separation", int(2 * ui_scale))
+		card.add_child(wrapper)
 		
 		var gate_icon = GateIcon.new()
 		gate_icon.gate_type = gate_type
 		gate_icon.name = gate_type + "Icon"
-		gate_icon.self_modulate = ThemeManager.get_gate_color(gate_type)
+		gate_icon.self_modulate = gate_color
 		gate_icon.custom_minimum_size = Vector2(icon_size, icon_size)
 		wrapper.add_child(gate_icon)
 		
 		var gate_label = Label.new()
 		gate_label.text = gate_type
 		gate_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		gate_label.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
+		gate_label.add_theme_color_override("font_color", Color(gate_color.r * 0.8, gate_color.g * 0.8, gate_color.b * 0.8, 0.9))
 		gate_label.add_theme_font_size_override("font_size", int(11 * ui_scale))
 		wrapper.add_child(gate_label)
 		
-		gate_toolbox.add_child(wrapper)
+		gate_toolbox.add_child(card)
 		gate_icon.gate_clicked.connect(_on_gate_icon_clicked)
-		# Hover scale animation on gate icon wrapper
-		wrapper.mouse_filter = Control.MOUSE_FILTER_STOP
-		var w_ref = wrapper
-		wrapper.mouse_entered.connect(func() -> void:
-			w_ref.pivot_offset = w_ref.size / 2.0
-			var tw_h = w_ref.create_tween()
-			tw_h.tween_property(w_ref, "scale", Vector2(1.12, 1.12), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# Enhanced hover with glow
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		var c_ref = card
+		var hover_style = card_style.duplicate()
+		hover_style.bg_color = Color(gate_color.r * 0.15, gate_color.g * 0.15, gate_color.b * 0.15, 0.8)
+		hover_style.border_color = Color(gate_color.r * 0.7, gate_color.g * 0.7, gate_color.b * 0.7, 0.8)
+		hover_style.shadow_size = 8
+		var normal_style = card_style
+		card.mouse_entered.connect(func() -> void:
+			c_ref.add_theme_stylebox_override("panel", hover_style)
+			c_ref.pivot_offset = c_ref.size / 2.0
+			var tw_h = c_ref.create_tween()
+			tw_h.tween_property(c_ref, "scale", Vector2(1.08, 1.08), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		)
-		wrapper.mouse_exited.connect(func() -> void:
-			var tw_h = w_ref.create_tween()
-			tw_h.tween_property(w_ref, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		card.mouse_exited.connect(func() -> void:
+			c_ref.add_theme_stylebox_override("panel", normal_style)
+			var tw_h = c_ref.create_tween()
+			tw_h.tween_property(c_ref, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		)
 
 func setup_circuit_board() -> void:
@@ -238,6 +289,15 @@ func setup_circuit_board() -> void:
 # --- SIGNAL HANDLERS ---
 
 func _on_gate_icon_clicked(_gate_type_clicked: String) -> void:
+	# Block interaction during tutorial when Continue button is visible
+	if _input_blocked and not _tutorial_complete:
+		return
+	# Tap-to-place: select gate type, then tap board to place
+	# Only enable tap-to-place after tutorial is complete (tutorial uses drag-and-drop)
+	var resp = get_node_or_null("/root/ResponsiveManager")
+	if resp and resp.is_touch_device and _tutorial_complete:
+		_selected_gate_type = _gate_type_clicked
+		_show_tap_place_indicator(_gate_type_clicked)
 	if _tutorial_complete:
 		return  # Normal play — no tutorial action needed
 	var steps = _get_tutorial_steps()
@@ -249,6 +309,10 @@ func _on_gate_placed(_gate_type: String, _gate: LogicGate) -> void:
 	gates_placed += 1
 	gates_placed_in_tutorial += 1
 	undo_system.record_place_gate(_gate)
+	# Clear tap-to-place indicator (may have been set if user tapped icon then dragged instead)
+	if _selected_gate_type != "":
+		_selected_gate_type = ""
+		_hide_tap_place_indicator()
 	# Gate drop animation
 	var anim = get_node_or_null("/root/AnimHelper")
 	if anim and _gate:
@@ -269,9 +333,6 @@ func _on_wire_connected(_wire: Wire) -> void:
 	var anim = get_node_or_null("/root/AnimHelper")
 	if anim and _wire:
 		anim.flash_wire(_wire, Color(0.0, 2.5, 2.5, 1.0), 0.4)
-	var sfx = get_node_or_null("/root/SFXManager")
-	if sfx and sfx.has_method("play_wire_click"):
-		pass  # Already handled in circuit_board
 	var min_wires: int = level_data.get("min_wires", 2)
 	if not _tutorial_complete and _get_tutorial_steps().size() >= 6 and tutorial_step == 4 and wires_connected >= min_wires:
 		await get_tree().create_timer(0.3).timeout
@@ -284,6 +345,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			_dismiss_good_luck()
 			get_viewport().set_input_as_handled()
 			return
+
+	# Block all board interactions during tutorial when input is blocked
+	if _input_blocked and not _tutorial_complete:
+		return
+
+	# Android back button → exit to level select
+	if event is InputEventKey and event.pressed and event.keycode == KEY_BACK:
+		_on_exit_button_pressed()
+		get_viewport().set_input_as_handled()
+		return
+
+	# Tap-to-place: if a gate type is selected and user taps the board area
+	if _selected_gate_type != "":
+		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or \
+		   (event is InputEventScreenTouch and event.pressed):
+			# Check if the tap is in the board area (not sidebar)
+			var vp_pos = event.position if event is InputEventScreenTouch else (event as InputEventMouseButton).position
+			var resp = get_node_or_null("/root/ResponsiveManager")
+			var sw: float = resp.sidebar_width if resp else 250.0
+			if vp_pos.x > sw and circuit_board:
+				var local_pos = circuit_board.get_local_mouse_position()
+				circuit_board.place_gate(_selected_gate_type, Vector2i.ZERO, local_pos)
+				_selected_gate_type = ""
+				_hide_tap_place_indicator()
+				get_viewport().set_input_as_handled()
+				return
+
 	if event is InputEventKey and event.pressed:
 		if event.ctrl_pressed and event.keycode == KEY_Z:
 			if event.shift_pressed:
@@ -331,14 +419,12 @@ func _on_output_signal_received(_value: int, output_node: OutputNode) -> void:
 func run_simulation() -> void:
 	if not level_started or level_complete:
 		return
+	var sfx = get_node_or_null("/root/SFXManager")
 	if circuit_board and circuit_board.wires.is_empty():
 		# No wires connected — nothing to simulate
-		var sfx = get_node_or_null("/root/SFXManager")
 		if sfx:
 			sfx.play_error_buzz()
 		return
-	
-	var sfx = get_node_or_null("/root/SFXManager")
 	if sfx:
 		sfx.play_simulation_hum(1.0)
 	await circuit_board.start_simulation()
@@ -347,6 +433,20 @@ func run_simulation() -> void:
 	await get_tree().create_timer(1.0).timeout
 	if sfx:
 		sfx.stop_simulation_hum()
+	# Check for failure after simulation completes
+	if not level_complete and _tutorial_complete:
+		var any_output_tested: bool = false
+		for out in circuit_board.output_nodes:
+			if out.received_sequence.size() > 0:
+				any_output_tested = true
+				break
+		if any_output_tested:
+			_show_level_failed()
+		else:
+			# No output received any signal — circuit is not connected properly
+			if sfx:
+				sfx.play_error_buzz()
+				sfx.apply_screen_shake(4.0, 0.2)
 
 # --- SCORING & LEVEL COMPLETION ---
 
@@ -373,6 +473,8 @@ func evaluate_level_performance() -> void:
 		sfx.play_victory_fanfare(score)
 		sfx.apply_screen_shake(3.0, 0.2)
 	show_level_complete_panel(score)
+	# Check for newly unlocked achievements
+	_check_achievements()
 
 func proceed_to_next_level() -> void:
 	var next_level = current_level_id + 1
@@ -391,13 +493,25 @@ func proceed_to_next_level() -> void:
 			if music_mgr:
 				music_mgr.set_chapter(next_chapter)
 
-		var tm = get_node_or_null("/root/TransitionMgr")
-		if tm and tm.has_method("transition_to_scene"):
-			tm.transition_to_scene(scene_path, is_chapter_change)
+		# Show interstitial ad (respects frequency cap — every 3 levels)
+		var ad_mgr = get_node_or_null("/root/AdManager")
+		if ad_mgr:
+			ad_mgr.interstitial_closed.connect(_on_ad_closed_proceed.bind(scene_path, is_chapter_change), CONNECT_ONE_SHOT)
+			ad_mgr.show_interstitial_if_ready()
 		else:
-			get_tree().change_scene_to_file(scene_path)
+			_do_scene_transition(scene_path, is_chapter_change)
 	else:
 		show_graduation_screen()
+
+func _on_ad_closed_proceed(scene_path: String, is_chapter_change: bool) -> void:
+	_do_scene_transition(scene_path, is_chapter_change)
+
+func _do_scene_transition(scene_path: String, is_chapter_change: bool) -> void:
+	var tm = get_node_or_null("/root/TransitionMgr")
+	if tm and tm.has_method("transition_to_scene"):
+		tm.transition_to_scene(scene_path, is_chapter_change)
+	else:
+		get_tree().change_scene_to_file(scene_path)
 
 func show_graduation_screen() -> void:
 	if not level_complete_panel:
@@ -464,13 +578,15 @@ func show_level_complete_panel(stars: int) -> void:
 	result_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 	result_text += "LEVEL %d COMPLETE\n" % current_level_id
 	result_text += "%s\n" % title
+	result_text += "Architect: %s\n" % Global.user_name
 	result_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 	result_text += "%s\n\n" % star_display
 	result_text += "%s\n\n" % grade_text
+	var actual_gates_result: int = circuit_board.gates.size() if circuit_board else gates_placed
+	var actual_wires_result: int = circuit_board.wires.size() if circuit_board else wires_connected
 	result_text += "Formula: %s\n" % formula
-	result_text += "Gates Used: %d / %d\n" % [gates_placed, max_gates]
-	result_text += "Wires Used: %d\n\n" % wires_connected
-	result_text += "Architect: %s" % Global.user_name
+	result_text += "Gates Used: %d / %d\n" % [actual_gates_result, max_gates]
+	result_text += "Wires Used: %d" % actual_wires_result
 	
 	level_complete_label.text = result_text
 	level_complete_panel.visible = true
@@ -500,6 +616,14 @@ func show_level_complete_panel(stars: int) -> void:
 		var center = vp_size / 2.0
 		anim.celebrate_stars(level_complete_panel, stars, center - Vector2(0, 40))
 		anim.spawn_particles(level_complete_panel, center, ThemeManager.SIGNAL_ACTIVE, 25)
+		# Confetti burst for 3-star performance
+		if stars >= 3:
+			anim.confetti_burst(level_complete_panel, center, 50)
+		elif stars >= 2:
+			anim.confetti_burst(level_complete_panel, center, 25)
+		# Ripple effect from center
+		var ch_accent2 = ThemeManager.get_chapter_accent(level_data.get("chapter", 1))
+		anim.ripple_effect(level_complete_panel, center, ch_accent2, 2)
 		# Setup button hovers on complete panel buttons
 		var share_btn = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/ShareBtn")
 		var next_btn2 = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/NextLevelBtn")
@@ -513,6 +637,9 @@ func show_level_complete_panel(stars: int) -> void:
 		tween.tween_property(level_complete_panel, "modulate:a", 1.0, 0.4)
 
 func create_level_complete_panel() -> void:
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+
 	level_complete_panel = PanelContainer.new()
 	level_complete_panel.name = "LevelCompletePanel"
 	level_complete_panel.anchor_left = 0.0
@@ -521,102 +648,80 @@ func create_level_complete_panel() -> void:
 	level_complete_panel.anchor_bottom = 1.0
 	level_complete_panel.visible = false
 	level_complete_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	
+
+	# Dark backdrop with deep glass feel
 	var completion_style = StyleBoxFlat.new()
-	completion_style.bg_color = Color(ThemeManager.MIDNIGHT_BG.r, ThemeManager.MIDNIGHT_BG.g,
-									   ThemeManager.MIDNIGHT_BG.b, 0.97)
-	completion_style.border_width_left = 3
-	completion_style.border_width_right = 3
-	completion_style.border_width_top = 3
-	completion_style.border_width_bottom = 3
-	completion_style.border_color = ThemeManager.SIGNAL_ACTIVE
+	completion_style.bg_color = Color(0.02, 0.03, 0.06, 0.95)
+	completion_style.border_width_left = 0
+	completion_style.border_width_right = 0
+	completion_style.border_width_top = 0
+	completion_style.border_width_bottom = 0
 	level_complete_panel.add_theme_stylebox_override("panel", completion_style)
-	
+
+	# Centered card container
+	var center_box = CenterContainer.new()
+	center_box.anchor_right = 1.0
+	center_box.anchor_bottom = 1.0
+	level_complete_panel.add_child(center_box)
+
+	# Inner glassmorphic card
+	var card = PanelContainer.new()
+	card.name = "ResultCard"
+	var card_style = ThemeManager.create_glass_panel(ch_accent, 16, 2)
+	card_style.shadow_color = Color(ch_accent.r * 0.2, ch_accent.g * 0.2, ch_accent.b * 0.2, 0.4)
+	card_style.shadow_size = 16
+	card.add_theme_stylebox_override("panel", card_style)
+	card.custom_minimum_size = Vector2(420, 300)
+	center_box.add_child(card)
+
 	var margin = MarginContainer.new()
 	margin.name = "Margin"
-	margin.add_theme_constant_override("margin_left", 80)
-	margin.add_theme_constant_override("margin_right", 80)
-	margin.add_theme_constant_override("margin_top", 60)
-	margin.add_theme_constant_override("margin_bottom", 40)
-	level_complete_panel.add_child(margin)
-	
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	card.add_child(margin)
+
 	var vbox = VBoxContainer.new()
 	vbox.name = "VBox"
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 20)
+	vbox.add_theme_constant_override("separation", 16)
 	margin.add_child(vbox)
-	
+
 	level_complete_label = Label.new()
 	level_complete_label.name = "ResultLabel"
 	level_complete_label.text = "LEVEL COMPLETE!"
 	level_complete_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_complete_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	level_complete_label.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
-	level_complete_label.add_theme_font_size_override("font_size", 24)
+	level_complete_label.add_theme_color_override("font_color", ch_accent)
+	level_complete_label.add_theme_font_size_override("font_size", 20)
 	level_complete_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(level_complete_label)
-	
+
+	# Glow divider
+	var divider = ThemeManager.create_glow_divider(ch_accent, 300.0)
+	vbox.add_child(divider)
+
 	var btn_row = HBoxContainer.new()
 	btn_row.name = "ButtonRow"
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_row.add_theme_constant_override("separation", 30)
+	btn_row.add_theme_constant_override("separation", 24)
 	vbox.add_child(btn_row)
-	
+
 	var share_btn = Button.new()
 	share_btn.name = "ShareBtn"
 	share_btn.text = "SHARE RESULT"
-	share_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	share_btn.custom_minimum_size = Vector2(200, 50)
-	share_btn.add_theme_font_size_override("font_size", 14)
-	
-	var share_style = StyleBoxFlat.new()
-	share_style.bg_color = Color(0.15, 0.18, 0.25, 1.0)
-	share_style.border_color = ThemeManager.SIGNAL_ACTIVE
-	share_style.border_width_left = 2
-	share_style.border_width_right = 2
-	share_style.border_width_top = 2
-	share_style.border_width_bottom = 2
-	share_style.corner_radius_top_left = 6
-	share_style.corner_radius_top_right = 6
-	share_style.corner_radius_bottom_left = 6
-	share_style.corner_radius_bottom_right = 6
-	share_style.content_margin_top = 8
-	share_style.content_margin_bottom = 8
-	share_btn.add_theme_stylebox_override("normal", share_style)
-	share_btn.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
-	
-	var share_hover = share_style.duplicate()
-	share_hover.bg_color = Color(0.2, 0.24, 0.32, 1.0)
-	share_btn.add_theme_stylebox_override("hover", share_hover)
-	
+	ThemeManager.create_premium_button(share_btn, ch_accent.darkened(0.3), 13, Vector2(180, 46))
 	share_btn.pressed.connect(_on_share_button_pressed)
 	btn_row.add_child(share_btn)
-	
+
 	var next_btn = Button.new()
 	next_btn.name = "NextLevelBtn"
 	next_btn.text = "NEXT LEVEL  ▶"
-	next_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	next_btn.custom_minimum_size = Vector2(200, 50)
-	next_btn.add_theme_font_size_override("font_size", 14)
-	
-	var next_style = StyleBoxFlat.new()
-	next_style.bg_color = ThemeManager.SIGNAL_ACTIVE
-	next_style.corner_radius_top_left = 6
-	next_style.corner_radius_top_right = 6
-	next_style.corner_radius_bottom_left = 6
-	next_style.corner_radius_bottom_right = 6
-	next_style.content_margin_top = 8
-	next_style.content_margin_bottom = 8
-	next_btn.add_theme_stylebox_override("normal", next_style)
-	next_btn.add_theme_color_override("font_color", ThemeManager.MIDNIGHT_BG)
-	
-	var next_hover = next_style.duplicate()
-	next_hover.bg_color = ThemeManager.SIGNAL_ACTIVE.lightened(0.2)
-	next_btn.add_theme_stylebox_override("hover", next_hover)
-	
+	ThemeManager.create_primary_button(next_btn, 13, Vector2(180, 46))
 	next_btn.pressed.connect(_on_next_level_button_pressed)
 	btn_row.add_child(next_btn)
-	
+
 	$CanvasLayer/MainUI.add_child(level_complete_panel)
 
 func _on_share_button_pressed() -> void:
@@ -627,21 +732,197 @@ func _on_share_button_pressed() -> void:
 			star_display += "★"
 		else:
 			star_display += "☆"
-	
-	var share_text = "Circuit Weaver — Level %d: %s\n%s\nGates: %d | Wires: %d\n\nI'm learning logic gates! Try it: Circuit Weaver" % [
-		current_level_id, title, star_display, gates_placed, wires_connected
+	var share_gates: int = circuit_board.gates.size() if circuit_board else gates_placed
+	var share_wires: int = circuit_board.wires.size() if circuit_board else wires_connected
+	const SHARE_URL := "https://circuitweaver.devmubarak.me"
+	var caption := "Circuit Weaver — Level %d: %s\n%s | Gates: %d | Wires: %d\n\nI'm learning logic gates! Download and try: %s" % [
+		current_level_id, title, star_display, share_gates, share_wires, SHARE_URL
 	]
-	
-	DisplayServer.clipboard_set(share_text)
-	
+	# Capture current screen (level complete panel visible) as image
+	await RenderingServer.frame_post_draw
+	var view_texture: ViewportTexture = get_viewport().get_texture()
+	var img: Image = view_texture.get_image()
+	# Save under user:// so share plugin can use path relative to user://
+	const SHARE_FILENAME := "circuit_weaver_share.png"
+	var save_path: String = "user://" + SHARE_FILENAME
+	var err: Error = img.save_png(save_path)
 	var share_btn = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/ShareBtn")
-	if share_btn:
-		share_btn.text = "COPIED TO CLIPBOARD!"
+	if err != OK:
+		DisplayServer.clipboard_set(caption)
+		if share_btn:
+			share_btn.text = "COPIED TO CLIPBOARD!"
 		await get_tree().create_timer(2.0).timeout
+		if share_btn:
+			share_btn.text = "SHARE RESULT"
+		return
+	# Open native share sheet when GodotShare plugin is available (Android)
+	var share_opened: bool = false
+	if Engine.has_singleton("GodotShare"):
+		var godot_share = Engine.get_singleton("GodotShare")
+		# GodotShare: share_img(path_relative_to_user, title, message)
+		if godot_share.has_method("share_img"):
+			godot_share.share_img(SHARE_FILENAME, "Circuit Weaver", caption)
+			share_opened = true
+		elif godot_share.has_method("sharePic"):
+			godot_share.sharePic(ProjectSettings.globalize_path(save_path), "Circuit Weaver", "My level result", caption)
+			share_opened = true
+	if not share_opened:
+		DisplayServer.clipboard_set(caption)
+	if share_btn:
+		share_btn.text = "SHARED!" if share_opened else "IMAGE SAVED · CAPTION COPIED!"
+	await get_tree().create_timer(2.0).timeout
+	if share_btn:
 		share_btn.text = "SHARE RESULT"
 
 func _on_next_level_button_pressed() -> void:
 	proceed_to_next_level()
+
+# --- LEVEL FAILED PANEL ---
+
+func _show_level_failed() -> void:
+	var sfx = get_node_or_null("/root/SFXManager")
+	if sfx:
+		sfx.play_error_buzz()
+		sfx.apply_screen_shake(8.0, 0.4)
+	if not _level_failed_panel:
+		_create_level_failed_panel()
+	
+	var title = level_data.get("title", "Level %d" % current_level_id)
+	var formula = level_data.get("formula", "")
+	var actual_gates_result: int = circuit_board.gates.size() if circuit_board else gates_placed
+	var actual_wires_result: int = circuit_board.wires.size() if circuit_board else wires_connected
+	
+	var result_text = ""
+	result_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	result_text += "SIMULATION FAILED\n"
+	result_text += "%s\n" % title
+	result_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+	result_text += "✗  ✗  ✗\n\n"
+	result_text += "Your circuit did not produce\nthe expected output.\n\n"
+	result_text += "Formula: %s\n" % formula
+	result_text += "Gates Used: %d\n" % actual_gates_result
+	result_text += "Wires Used: %d\n\n" % actual_wires_result
+	result_text += "Review your wiring and try again,\nArchitect %s!" % Global.user_name
+	
+	_level_failed_label.text = result_text
+	_level_failed_panel.visible = true
+	
+	_level_failed_panel.modulate.a = 0.0
+	var anim = get_node_or_null("/root/AnimHelper")
+	if anim:
+		_level_failed_panel.pivot_offset = _level_failed_panel.size / 2.0
+		_level_failed_panel.scale = Vector2(0.85, 0.85)
+		var tw = _level_failed_panel.create_tween().set_parallel(true)
+		tw.tween_property(_level_failed_panel, "modulate:a", 1.0, 0.4)
+		tw.tween_property(_level_failed_panel, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		var tween = create_tween()
+		tween.tween_property(_level_failed_panel, "modulate:a", 1.0, 0.4)
+
+func _create_level_failed_panel() -> void:
+	var chapter: int = level_data.get("chapter", 1)
+	var fail_color: Color = ThemeManager.ACCENT_WARNING
+
+	_level_failed_panel = PanelContainer.new()
+	_level_failed_panel.name = "LevelFailedPanel"
+	_level_failed_panel.anchor_left = 0.0
+	_level_failed_panel.anchor_top = 0.0
+	_level_failed_panel.anchor_right = 1.0
+	_level_failed_panel.anchor_bottom = 1.0
+	_level_failed_panel.visible = false
+	_level_failed_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var fail_style = StyleBoxFlat.new()
+	fail_style.bg_color = Color(0.06, 0.02, 0.02, 0.95)
+	_level_failed_panel.add_theme_stylebox_override("panel", fail_style)
+
+	var center_box = CenterContainer.new()
+	center_box.anchor_right = 1.0
+	center_box.anchor_bottom = 1.0
+	_level_failed_panel.add_child(center_box)
+
+	var card = PanelContainer.new()
+	card.name = "FailCard"
+	var card_style = ThemeManager.create_glass_panel(fail_color, 16, 2)
+	card_style.shadow_color = Color(fail_color.r * 0.2, fail_color.g * 0.2, fail_color.b * 0.2, 0.4)
+	card_style.shadow_size = 16
+	card.add_theme_stylebox_override("panel", card_style)
+	card.custom_minimum_size = Vector2(420, 300)
+	center_box.add_child(card)
+
+	var margin = MarginContainer.new()
+	margin.name = "Margin"
+	margin.add_theme_constant_override("margin_left", 40)
+	margin.add_theme_constant_override("margin_right", 40)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	card.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBox"
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 16)
+	margin.add_child(vbox)
+
+	_level_failed_label = Label.new()
+	_level_failed_label.name = "FailLabel"
+	_level_failed_label.text = "SIMULATION FAILED"
+	_level_failed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_failed_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_level_failed_label.add_theme_color_override("font_color", fail_color)
+	_level_failed_label.add_theme_font_size_override("font_size", 20)
+	_level_failed_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(_level_failed_label)
+
+	var divider = ThemeManager.create_glow_divider(fail_color, 300.0)
+	vbox.add_child(divider)
+
+	var btn_row = HBoxContainer.new()
+	btn_row.name = "ButtonRow"
+	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_row.add_theme_constant_override("separation", 24)
+	vbox.add_child(btn_row)
+
+	var retry_btn = Button.new()
+	retry_btn.name = "RetryBtn"
+	retry_btn.text = "↻  RETRY"
+	ThemeManager.create_primary_button(retry_btn, 13, Vector2(180, 46))
+	retry_btn.pressed.connect(_on_retry_button_pressed)
+	btn_row.add_child(retry_btn)
+
+	var hint_btn = Button.new()
+	hint_btn.name = "FailHintBtn"
+	hint_btn.text = "HINT"
+	ThemeManager.create_premium_button(hint_btn, Color(0.7, 0.55, 0.1), 13, Vector2(120, 46))
+	hint_btn.pressed.connect(func() -> void:
+		_level_failed_panel.visible = false
+		_on_hint_button_pressed()
+	)
+	btn_row.add_child(hint_btn)
+
+	# Setup button hovers
+	var anim = get_node_or_null("/root/AnimHelper")
+	if anim:
+		_setup_fail_btn_hovers.call_deferred(retry_btn, hint_btn)
+
+	$CanvasLayer/MainUI.add_child(_level_failed_panel)
+
+func _setup_fail_btn_hovers(retry_btn: Button, hint_btn2: Button) -> void:
+	var anim = get_node_or_null("/root/AnimHelper")
+	if not anim:
+		return
+	await get_tree().process_frame
+	if retry_btn and retry_btn.is_inside_tree():
+		anim.setup_button_hover(retry_btn)
+	if hint_btn2 and hint_btn2.is_inside_tree():
+		anim.setup_button_hover(hint_btn2)
+
+func _on_retry_button_pressed() -> void:
+	if _level_failed_panel:
+		_level_failed_panel.visible = false
+	# Reset simulation state so user can rewire and try again
+	if circuit_board:
+		circuit_board.reset_all_gates()
 
 # --- TUTORIAL SYSTEM ---
 
@@ -746,7 +1027,7 @@ func _start_good_luck_auto_dismiss() -> void:
 		_good_luck_timer.queue_free()
 	_good_luck_timer = Timer.new()
 	_good_luck_timer.one_shot = true
-	_good_luck_timer.wait_time = 5.0
+	_good_luck_timer.wait_time = 3.0
 	_good_luck_timer.timeout.connect(_dismiss_good_luck)
 	add_child(_good_luck_timer)
 	_good_luck_timer.start()
@@ -794,21 +1075,12 @@ func _create_tutorial_corner() -> void:
 	var instruction_box = PanelContainer.new()
 	instruction_box.name = "InstructionBox"
 	instruction_box.mouse_filter = Control.MOUSE_FILTER_PASS
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(ThemeManager.MIDNIGHT_BG.r, ThemeManager.MIDNIGHT_BG.g, ThemeManager.MIDNIGHT_BG.b, 0.94)
-	style.border_color = ThemeManager.SIGNAL_ACTIVE
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 8
+	# Glassmorphic tutorial panel with chapter accent
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var style = ThemeManager.create_glass_panel_accent(ch_accent, 10)
 	style.corner_radius_top_right = 0
-	style.corner_radius_bottom_left = 8
 	style.corner_radius_bottom_right = 0
-	style.content_margin_left = 18
-	style.content_margin_right = 18
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
 	instruction_box.add_theme_stylebox_override("panel", style)
 	instruction_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hbox.add_child(instruction_box)
@@ -834,25 +1106,12 @@ func _create_tutorial_corner() -> void:
 	
 	_tutorial_continue_btn = Button.new()
 	_tutorial_continue_btn.name = "ContinueBtn"
-	_tutorial_continue_btn.text = "Continue →"
-	_tutorial_continue_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_tutorial_continue_btn.add_theme_color_override("font_color", ThemeManager.MIDNIGHT_BG)
-	_tutorial_continue_btn.add_theme_font_size_override("font_size", int(12 * ui_scale))
-	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = ThemeManager.SIGNAL_ACTIVE
-	btn_style.corner_radius_top_left = 4
-	btn_style.corner_radius_top_right = 4
-	btn_style.corner_radius_bottom_left = 4
-	btn_style.corner_radius_bottom_right = 4
-	_tutorial_continue_btn.add_theme_stylebox_override("normal", btn_style)
-	_tutorial_continue_btn.custom_minimum_size = Vector2(120 * ui_scale, 30 * ui_scale)
+	_tutorial_continue_btn.text = "Continue >>"
+	ThemeManager.create_primary_button(_tutorial_continue_btn, int(12 * ui_scale), Vector2(120 * ui_scale, 30 * ui_scale))
 	_tutorial_continue_btn.pressed.connect(_on_continue_button_pressed)
 	vbox.add_child(_tutorial_continue_btn)
-	
-	# Continue button hover + pressed style
-	var btn_hover_style = btn_style.duplicate()
-	btn_hover_style.bg_color = ThemeManager.SIGNAL_ACTIVE.lightened(0.2)
-	_tutorial_continue_btn.add_theme_stylebox_override("hover", btn_hover_style)
+
+	# Continue button hover
 	var anim = get_node_or_null("/root/AnimHelper")
 	if anim:
 		_setup_continue_btn_hover.call_deferred()
@@ -921,7 +1180,7 @@ func _move_panel_bottom() -> void:
 
 func _process(_delta: float) -> void:
 	# Move tutorial panel out of the way when user drags near it
-	if not tutorial_panel or not tutorial_panel.is_inside_tree():
+	if not tutorial_panel or not tutorial_panel.is_inside_tree() or _tutorial_complete:
 		return
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
@@ -958,98 +1217,72 @@ func _create_run_button() -> void:
 	var spacer = Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sidebar_vbox.add_child(spacer)
-	
+
+	# Utility button row: HINT, TABLE, SHORTCUTS
+	var util_row = HBoxContainer.new()
+	util_row.name = "UtilRow"
+	util_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	util_row.add_theme_constant_override("separation", 4)
+	sidebar_vbox.add_child(util_row)
+
+	_hint_btn = Button.new()
+	_hint_btn.name = "HintButton"
+	_hint_btn.text = "HINT"
+	ThemeManager.create_premium_button(_hint_btn, Color(0.7, 0.55, 0.1), 11, Vector2(0, 32))
+	_hint_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hint_btn.pressed.connect(_on_hint_button_pressed)
+	util_row.add_child(_hint_btn)
+	var hints: Array = level_data.get("hints", [])
+	if hints.is_empty():
+		_hint_btn.disabled = true
+		_hint_btn.text = "NO HINTS"
+
+	var table_btn = Button.new()
+	table_btn.name = "TableButton"
+	table_btn.text = "TABLE"
+	ThemeManager.create_premium_button(table_btn, Color(0.15, 0.4, 0.5), 11, Vector2(0, 32))
+	table_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	table_btn.pressed.connect(_on_truth_table_button_pressed)
+	util_row.add_child(table_btn)
+
+	var help_btn = Button.new()
+	help_btn.name = "HelpButton"
+	help_btn.text = "?"
+	ThemeManager.create_premium_button(help_btn, Color(0.3, 0.3, 0.4), 11, Vector2(32, 32))
+	help_btn.pressed.connect(_on_shortcuts_button_pressed)
+	util_row.add_child(help_btn)
+
 	var settings_btn = Button.new()
 	settings_btn.name = "SettingsButton"
 	settings_btn.text = "SETTINGS"
-	settings_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	settings_btn.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
-	settings_btn.add_theme_font_size_override("font_size", 12)
-	var settings_style = StyleBoxFlat.new()
-	settings_style.bg_color = Color(0.12, 0.14, 0.20)
-	settings_style.corner_radius_top_left = 4
-	settings_style.corner_radius_top_right = 4
-	settings_style.corner_radius_bottom_left = 4
-	settings_style.corner_radius_bottom_right = 4
-	settings_style.content_margin_top = 6
-	settings_style.content_margin_bottom = 6
-	settings_btn.add_theme_stylebox_override("normal", settings_style)
-	var settings_hover = settings_style.duplicate()
-	settings_hover.bg_color = Color(0.18, 0.20, 0.28)
-	settings_btn.add_theme_stylebox_override("hover", settings_hover)
-	settings_btn.custom_minimum_size = Vector2(0, 36)
-	settings_btn.pressed.connect(_on_settings_button_pressed)
+	ThemeManager.create_premium_button(settings_btn, Color(0.25, 0.28, 0.35), 12, Vector2(0, 36))
 	sidebar_vbox.add_child(settings_btn)
+	settings_btn.pressed.connect(_on_settings_button_pressed)
 
 	var reset_btn = Button.new()
 	reset_btn.name = "ResetButton"
 	reset_btn.text = "RESET LEVEL"
-	reset_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	reset_btn.add_theme_color_override("font_color", ThemeManager.ACCENT_WARNING)
-	reset_btn.add_theme_font_size_override("font_size", 12)
-	var reset_style = StyleBoxFlat.new()
-	reset_style.bg_color = Color(0.15, 0.10, 0.12)
-	reset_style.corner_radius_top_left = 4
-	reset_style.corner_radius_top_right = 4
-	reset_style.corner_radius_bottom_left = 4
-	reset_style.corner_radius_bottom_right = 4
-	reset_style.content_margin_top = 6
-	reset_style.content_margin_bottom = 6
-	reset_btn.add_theme_stylebox_override("normal", reset_style)
-	var reset_hover = reset_style.duplicate()
-	reset_hover.bg_color = Color(0.25, 0.15, 0.18)
-	reset_btn.add_theme_stylebox_override("hover", reset_hover)
-	reset_btn.custom_minimum_size = Vector2(0, 36)
-	reset_btn.pressed.connect(_on_reset_button_pressed)
+	ThemeManager.create_premium_button(reset_btn, Color(0.5, 0.3, 0.1), 12, Vector2(0, 36))
 	sidebar_vbox.add_child(reset_btn)
+	reset_btn.pressed.connect(_on_reset_button_pressed)
 
 	var exit_btn = Button.new()
 	exit_btn.name = "ExitButton"
 	exit_btn.text = "EXIT"
-	exit_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	exit_btn.add_theme_color_override("font_color", Color.WHITE)
-	exit_btn.add_theme_font_size_override("font_size", 12)
-	var exit_style = StyleBoxFlat.new()
-	exit_style.bg_color = Color(0.6, 0.15, 0.15)
-	exit_style.corner_radius_top_left = 4
-	exit_style.corner_radius_top_right = 4
-	exit_style.corner_radius_bottom_left = 4
-	exit_style.corner_radius_bottom_right = 4
-	exit_style.content_margin_top = 6
-	exit_style.content_margin_bottom = 6
-	exit_btn.add_theme_stylebox_override("normal", exit_style)
-	var exit_hover = exit_style.duplicate()
-	exit_hover.bg_color = Color(0.8, 0.2, 0.2)
-	exit_btn.add_theme_stylebox_override("hover", exit_hover)
-	exit_btn.custom_minimum_size = Vector2(0, 36)
-	exit_btn.pressed.connect(_on_exit_button_pressed)
+	ThemeManager.create_danger_button(exit_btn, 12, Vector2(0, 36))
 	sidebar_vbox.add_child(exit_btn)
+	exit_btn.pressed.connect(_on_exit_button_pressed)
 
 	run_button = Button.new()
 	run_button.name = "RunButton"
-	run_button.text = "RUN SIMULATION"
-	run_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	run_button.add_theme_color_override("font_color", ThemeManager.MIDNIGHT_BG)
-	run_button.add_theme_font_size_override("font_size", 14)
-	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = ThemeManager.SIGNAL_ACTIVE
-	btn_style.corner_radius_top_left = 4
-	btn_style.corner_radius_top_right = 4
-	btn_style.corner_radius_bottom_left = 4
-	btn_style.corner_radius_bottom_right = 4
-	btn_style.content_margin_top = 8
-	btn_style.content_margin_bottom = 8
-	run_button.add_theme_stylebox_override("normal", btn_style)
-	var btn_hover = btn_style.duplicate()
-	btn_hover.bg_color = ThemeManager.SIGNAL_ACTIVE.lightened(0.2)
-	run_button.add_theme_stylebox_override("hover", btn_hover)
-	run_button.custom_minimum_size = Vector2(0, 42)
+	run_button.text = "▶  RUN SIMULATION"
+	ThemeManager.create_primary_button(run_button, 14, Vector2(0, 44))
 	run_button.pressed.connect(_on_run_button_pressed)
 	sidebar_vbox.add_child(run_button)
 	run_button.hide()
-
 	# Setup hover animations for all sidebar buttons after layout pass
 	_setup_sidebar_hover_anims(settings_btn, reset_btn, exit_btn, run_button)
+	_setup_util_btn_hovers.call_deferred(_hint_btn, table_btn, help_btn)
 
 func _setup_sidebar_hover_anims(s_btn: Button, r_btn: Button, e_btn: Button, rn_btn: Button) -> void:
 	var anim = get_node_or_null("/root/AnimHelper")
@@ -1088,9 +1321,9 @@ func _on_reset_button_pressed() -> void:
 
 func _on_settings_button_pressed() -> void:
 	if _settings_panel and _settings_panel.visible:
-		var anim = get_node_or_null("/root/AnimHelper")
-		if anim:
-			var tw = anim.pop_out(_settings_panel, 0.2)
+		var anim_close = get_node_or_null("/root/AnimHelper")
+		if anim_close:
+			var tw = anim_close.pop_out(_settings_panel, 0.2)
 			await tw.finished
 		_settings_panel.visible = false
 		return
@@ -1103,6 +1336,9 @@ func _on_settings_button_pressed() -> void:
 
 func _on_continue_button_pressed() -> void:
 	var steps = _get_tutorial_steps()
+	# Unblock input when Continue is clicked (for 6-step tutorials, steps 2+ need interaction)
+	if steps.size() >= 6 and tutorial_step == 1:
+		_input_blocked = false
 	if tutorial_step < steps.size():
 		advance_tutorial()
 	elif tutorial_step >= steps.size() and not _tutorial_complete:
@@ -1121,17 +1357,15 @@ func _on_run_button_pressed() -> void:
 
 func _on_tutorial_complete() -> void:
 	_tutorial_complete = true
+	_input_blocked = false
 	# Show run button now that tutorial is done
 	if run_button and not run_button.visible:
 		run_button.show()
 		var anim = get_node_or_null("/root/AnimHelper")
 		if anim:
 			anim.bounce(run_button, 1.15, 0.3)
-	var config := ConfigFile.new()
-	config.load(Global.SAVE_PATH)
-	config.set_value("Progress", "tutorial_done", true)
-	config.set_value("Progress", "level_%d_score" % current_level_id, Global.current_level_score)
-	config.save(Global.SAVE_PATH)
+	# Persist progress through the canonical save path
+	Global.save_progress()
 
 # --- LEVEL ENTRANCE ANIMATION ---
 
@@ -1197,6 +1431,127 @@ func _apply_responsive_layout() -> void:
 		run_button.custom_minimum_size = Vector2(0, resp.get_button_height())
 		run_button.add_theme_font_size_override("font_size", int(14 * ui_scale))
 
+	# Mobile: add sidebar toggle button
+	if resp.is_touch_device and not _sidebar_toggle_btn:
+		_create_sidebar_toggle()
+
+	# Mobile portrait: switch gate toolbox to horizontal grid
+	if resp.is_mobile() and gate_toolbox:
+		var scroll = gate_toolbox.get_parent() as ScrollContainer
+		if scroll:
+			scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+			scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+
+# --- TAP-TO-PLACE INDICATOR (mobile) ---
+
+func _show_tap_place_indicator(gate_type: String) -> void:
+	_hide_tap_place_indicator()
+	_tap_place_label = Label.new()
+	_tap_place_label.name = "TapPlaceLabel"
+	_tap_place_label.text = "TAP BOARD TO PLACE %s" % gate_type
+	_tap_place_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tap_place_label.anchor_left = 0.5
+	_tap_place_label.anchor_top = 0.0
+	_tap_place_label.anchor_right = 0.5
+	_tap_place_label.anchor_bottom = 0.0
+	_tap_place_label.offset_left = -120
+	_tap_place_label.offset_top = 6
+	_tap_place_label.offset_right = 120
+	_tap_place_label.offset_bottom = 30
+	var ch_accent: Color = ThemeManager.get_chapter_accent(level_data.get("chapter", 1))
+	_tap_place_label.add_theme_color_override("font_color", ch_accent)
+	_tap_place_label.add_theme_font_size_override("font_size", 13)
+	$CanvasLayer/MainUI.add_child(_tap_place_label)
+	# Pulse animation
+	var tw = _tap_place_label.create_tween().set_loops(0)
+	tw.tween_property(_tap_place_label, "modulate:a", 0.4, 0.5)
+	tw.tween_property(_tap_place_label, "modulate:a", 1.0, 0.5)
+
+func _hide_tap_place_indicator() -> void:
+	if _tap_place_label and is_instance_valid(_tap_place_label):
+		_tap_place_label.queue_free()
+		_tap_place_label = null
+
+# --- MOBILE SIDEBAR TOGGLE ---
+
+func _create_sidebar_toggle() -> void:
+	_sidebar_toggle_btn = Button.new()
+	_sidebar_toggle_btn.name = "SidebarToggle"
+	_sidebar_toggle_btn.text = "<"
+	_sidebar_toggle_btn.flat = false
+	_sidebar_toggle_btn.anchor_left = 0.0
+	_sidebar_toggle_btn.anchor_top = 0.5
+	_sidebar_toggle_btn.anchor_right = 0.0
+	_sidebar_toggle_btn.anchor_bottom = 0.5
+	_sidebar_toggle_btn.offset_top = -20
+	_sidebar_toggle_btn.offset_bottom = 20
+	_sidebar_toggle_btn.offset_right = 28
+	_sidebar_toggle_btn.z_index = 10
+	_sidebar_toggle_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.08, 0.12, 0.85)
+	style.border_color = ThemeManager.SIGNAL_ACTIVE
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_right = 8
+	_sidebar_toggle_btn.add_theme_stylebox_override("normal", style)
+	_sidebar_toggle_btn.add_theme_stylebox_override("hover", style)
+	_sidebar_toggle_btn.add_theme_stylebox_override("pressed", style)
+	_sidebar_toggle_btn.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
+	_sidebar_toggle_btn.add_theme_font_size_override("font_size", 16)
+	_sidebar_toggle_btn.pressed.connect(_toggle_sidebar)
+
+	$CanvasLayer/MainUI.add_child(_sidebar_toggle_btn)
+	_update_sidebar_toggle_position()
+
+func _toggle_sidebar() -> void:
+	var sidebar = get_node_or_null("CanvasLayer/MainUI/HBoxContainer/Sidebar") as PanelContainer
+	if not sidebar:
+		return
+	_sidebar_visible = not _sidebar_visible
+	sidebar.visible = _sidebar_visible
+	_sidebar_toggle_btn.text = "<" if _sidebar_visible else ">"
+	_update_sidebar_toggle_position()
+	# Keep toggle on top so it stays visible when sidebar is closed
+	var main_ui = get_node_or_null("CanvasLayer/MainUI")
+	if main_ui and _sidebar_toggle_btn.get_index() < main_ui.get_child_count() - 1:
+		main_ui.move_child(_sidebar_toggle_btn, main_ui.get_child_count() - 1)
+	# Re-trigger camera layout  
+	var resp = get_node_or_null("/root/ResponsiveManager")
+	if resp:
+		var cam = get_node_or_null("Camera2D") as Camera2D
+		if cam:
+			if _sidebar_visible:
+				cam.zoom = resp.get_camera_zoom()
+				cam.position = resp.get_camera_center()
+			else:
+				# Full screen for board — recalculate
+				var vp = get_viewport().get_visible_rect().size
+				var z = clampf(vp.x / 750.0, 0.5, 1.6)
+				cam.zoom = Vector2(z, z)
+				cam.position = Vector2(720.0, 130.0 + 100.0 / z)
+
+func _update_sidebar_toggle_position() -> void:
+	if not _sidebar_toggle_btn:
+		return
+	var resp = get_node_or_null("/root/ResponsiveManager")
+	var sw: float = resp.sidebar_width if resp else 250.0
+	_sidebar_toggle_btn.visible = true
+	if _sidebar_visible:
+		_sidebar_toggle_btn.offset_left = sw
+		_sidebar_toggle_btn.offset_right = sw + 28
+	else:
+		# When closed: pin to left edge so "open" (>) button is always visible
+		_sidebar_toggle_btn.offset_left = 0
+		_sidebar_toggle_btn.offset_right = 28
+	# Ensure toggle is drawn on top of HBox and other UI
+	var main_ui = get_node_or_null("CanvasLayer/MainUI")
+	if main_ui and _sidebar_toggle_btn.get_parent() == main_ui and _sidebar_toggle_btn.get_index() < main_ui.get_child_count() - 1:
+		main_ui.move_child(_sidebar_toggle_btn, main_ui.get_child_count() - 1)
+
 # --- SETTINGS PANEL ---
 
 func _create_settings_panel() -> void:
@@ -1208,17 +1563,11 @@ func _create_settings_panel() -> void:
 	_settings_panel.anchor_bottom = 0.85
 	_settings_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = Color(ThemeManager.MIDNIGHT_BG.r, ThemeManager.MIDNIGHT_BG.g, ThemeManager.MIDNIGHT_BG.b, 0.97)
-	bg_style.border_color = ThemeManager.SIGNAL_ACTIVE
-	bg_style.border_width_left = 2
-	bg_style.border_width_right = 2
-	bg_style.border_width_top = 2
-	bg_style.border_width_bottom = 2
-	bg_style.corner_radius_top_left = 8
-	bg_style.corner_radius_top_right = 8
-	bg_style.corner_radius_bottom_left = 8
-	bg_style.corner_radius_bottom_right = 8
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var bg_style = ThemeManager.create_glass_panel(ch_accent, 12, 2)
+	bg_style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	bg_style.shadow_size = 12
 	_settings_panel.add_theme_stylebox_override("panel", bg_style)
 
 	var margin = MarginContainer.new()
@@ -1236,9 +1585,12 @@ func _create_settings_panel() -> void:
 	var title_lbl = Label.new()
 	title_lbl.text = "SETTINGS"
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
+	title_lbl.add_theme_color_override("font_color", ch_accent)
 	title_lbl.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(title_lbl)
+
+	var settings_div = ThemeManager.create_glow_divider(ch_accent, 200.0)
+	vbox.add_child(settings_div)
 
 	_add_slider_row(vbox, "Master Volume", _get_master_vol(), func(val: float) -> void:
 		var sfx = get_node_or_null("/root/SFXManager")
@@ -1296,19 +1648,7 @@ func _create_settings_panel() -> void:
 
 	var close_btn = Button.new()
 	close_btn.text = "CLOSE"
-	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	close_btn.add_theme_color_override("font_color", ThemeManager.MIDNIGHT_BG)
-	close_btn.add_theme_font_size_override("font_size", 14)
-	var close_style = StyleBoxFlat.new()
-	close_style.bg_color = ThemeManager.SIGNAL_ACTIVE
-	close_style.corner_radius_top_left = 4
-	close_style.corner_radius_top_right = 4
-	close_style.corner_radius_bottom_left = 4
-	close_style.corner_radius_bottom_right = 4
-	close_style.content_margin_top = 8
-	close_style.content_margin_bottom = 8
-	close_btn.add_theme_stylebox_override("normal", close_style)
-	close_btn.custom_minimum_size = Vector2(120, 40)
+	ThemeManager.create_primary_button(close_btn, 14, Vector2(120, 40))
 	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	close_btn.pressed.connect(func() -> void:
 		var anim2 = get_node_or_null("/root/AnimHelper")
@@ -1322,14 +1662,14 @@ func _create_settings_panel() -> void:
 	$CanvasLayer/MainUI.add_child(_settings_panel)
 
 	# Setup hover on close button (deferred so it has layout size)
-	var anim = get_node_or_null("/root/AnimHelper")
-	if anim:
+	var anim_setup = get_node_or_null("/root/AnimHelper")
+	if anim_setup:
 		_setup_close_btn_hover.call_deferred(close_btn)
 
 func _setup_close_btn_hover(btn: Button) -> void:
-	var anim = get_node_or_null("/root/AnimHelper")
-	if anim and btn and btn.is_inside_tree():
-		anim.setup_button_hover(btn)
+	var anim_h = get_node_or_null("/root/AnimHelper")
+	if anim_h and btn and btn.is_inside_tree():
+		anim_h.setup_button_hover(btn)
 
 func _add_slider_row(parent: VBoxContainer, label_text: String, initial: float, on_change: Callable) -> void:
 	var row = HBoxContainer.new()
@@ -1366,3 +1706,469 @@ func _get_music_enabled() -> bool:
 func _get_shake_enabled() -> bool:
 	var s = get_node_or_null("/root/SFXManager")
 	return s.get_screen_shake() if s else true
+
+# ===================================================================
+# UTILITY BUTTON HOVERS
+# ===================================================================
+
+func _setup_util_btn_hovers(h_btn: Button, t_btn: Button, hp_btn: Button) -> void:
+	var anim = get_node_or_null("/root/AnimHelper")
+	if not anim:
+		return
+	for btn in [h_btn, t_btn, hp_btn]:
+		if btn and btn.is_inside_tree():
+			anim.setup_button_hover(btn, 1.05)
+
+# ===================================================================
+# KEYBOARD SHORTCUTS PANEL
+# ===================================================================
+
+func _on_shortcuts_button_pressed() -> void:
+	var sfx = get_node_or_null("/root/SFXManager")
+	if sfx:
+		sfx.play_button_press()
+	if _shortcuts_panel and _shortcuts_panel.visible:
+		var anim_out = get_node_or_null("/root/AnimHelper")
+		if anim_out:
+			var tw = anim_out.pop_out(_shortcuts_panel, 0.2)
+			await tw.finished
+		_shortcuts_panel.visible = false
+		return
+	if not _shortcuts_panel:
+		_create_shortcuts_panel()
+	_shortcuts_panel.visible = true
+	var anim = get_node_or_null("/root/AnimHelper")
+	if anim:
+		anim.pop_in(_shortcuts_panel, 0.3)
+
+func _create_shortcuts_panel() -> void:
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+
+	_shortcuts_panel = PanelContainer.new()
+	_shortcuts_panel.name = "ShortcutsPanel"
+	_shortcuts_panel.anchor_left = 0.5
+	_shortcuts_panel.anchor_top = 0.5
+	_shortcuts_panel.anchor_right = 0.5
+	_shortcuts_panel.anchor_bottom = 0.5
+	_shortcuts_panel.offset_left = -185
+	_shortcuts_panel.offset_top = -165
+	_shortcuts_panel.offset_right = 185
+	_shortcuts_panel.offset_bottom = 165
+	_shortcuts_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var bg_style = ThemeManager.create_glass_panel(ch_accent, 12, 2)
+	bg_style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	bg_style.shadow_size = 12
+	_shortcuts_panel.add_theme_stylebox_override("panel", bg_style)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	_shortcuts_panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "KEYBOARD SHORTCUTS"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_color_override("font_color", ch_accent)
+	title_lbl.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(title_lbl)
+
+	var div = ThemeManager.create_glow_divider(ch_accent, 200.0)
+	vbox.add_child(div)
+
+	var shortcuts_data = [
+		["Ctrl + Z", "Undo last action"],
+		["Ctrl + Shift + Z", "Redo last action"],
+		["Ctrl + Y", "Redo (alternate)"],
+		["Delete", "Remove selected gate"],
+		["Escape", "Cancel current wire"],
+		["Click + Drag", "Draw wires between nodes"],
+		["Click gate icon", "Place gate on board"],
+	]
+
+	for shortcut in shortcuts_data:
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+
+		var key_lbl = Label.new()
+		key_lbl.text = shortcut[0]
+		key_lbl.add_theme_color_override("font_color", ThemeManager.ACCENT_WARNING)
+		key_lbl.add_theme_font_size_override("font_size", 12)
+		key_lbl.custom_minimum_size = Vector2(130, 0)
+		row.add_child(key_lbl)
+
+		var desc_lbl = Label.new()
+		desc_lbl.text = shortcut[1]
+		desc_lbl.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
+		desc_lbl.add_theme_font_size_override("font_size", 12)
+		row.add_child(desc_lbl)
+
+		vbox.add_child(row)
+
+	var sc_spacer = Control.new()
+	sc_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(sc_spacer)
+
+	var close_btn = Button.new()
+	close_btn.text = "CLOSE"
+	ThemeManager.create_primary_button(close_btn, 12, Vector2(100, 34))
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	close_btn.pressed.connect(func() -> void:
+		var anim_c = get_node_or_null("/root/AnimHelper")
+		if anim_c:
+			var tw_c = anim_c.pop_out(_shortcuts_panel, 0.2)
+			await tw_c.finished
+		_shortcuts_panel.visible = false
+	)
+	vbox.add_child(close_btn)
+
+	$CanvasLayer/MainUI.add_child(_shortcuts_panel)
+
+	var anim_setup = get_node_or_null("/root/AnimHelper")
+	if anim_setup:
+		_setup_panel_close_hover.call_deferred(close_btn)
+
+# ===================================================================
+# TRUTH TABLE REFERENCE PANEL
+# ===================================================================
+
+func _on_truth_table_button_pressed() -> void:
+	var sfx = get_node_or_null("/root/SFXManager")
+	if sfx:
+		sfx.play_button_press()
+	if _truth_table_panel and _truth_table_panel.visible:
+		var anim_out = get_node_or_null("/root/AnimHelper")
+		if anim_out:
+			var tw = anim_out.pop_out(_truth_table_panel, 0.2)
+			await tw.finished
+		_truth_table_panel.visible = false
+		return
+	if not _truth_table_panel:
+		_create_truth_table_panel()
+	_truth_table_panel.visible = true
+	var anim = get_node_or_null("/root/AnimHelper")
+	if anim:
+		anim.pop_in(_truth_table_panel, 0.3)
+
+func _create_truth_table_panel() -> void:
+	var chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var allowed: Array = level_data.get("allowed_gates", [])
+
+	_truth_table_panel = PanelContainer.new()
+	_truth_table_panel.name = "TruthTablePanel"
+	_truth_table_panel.anchor_left = 0.5
+	_truth_table_panel.anchor_top = 0.5
+	_truth_table_panel.anchor_right = 0.5
+	_truth_table_panel.anchor_bottom = 0.5
+	var panel_h: int = mini(120 + allowed.size() * 110, 450)
+	_truth_table_panel.offset_left = -200
+	_truth_table_panel.offset_top = -panel_h / 2.0
+	_truth_table_panel.offset_right = 200
+	_truth_table_panel.offset_bottom = panel_h / 2.0
+	_truth_table_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var bg_style = ThemeManager.create_glass_panel(ch_accent, 12, 2)
+	bg_style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	bg_style.shadow_size = 12
+	_truth_table_panel.add_theme_stylebox_override("panel", bg_style)
+
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_truth_table_panel.add_child(scroll)
+
+	var margin = MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	scroll.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "TRUTH TABLE REFERENCE"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_color_override("font_color", ch_accent)
+	title_lbl.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(title_lbl)
+
+	var div = ThemeManager.create_glow_divider(ch_accent, 220.0)
+	vbox.add_child(div)
+
+	for gate_type in allowed:
+		var table: Dictionary = GateIcon.TRUTH_TABLES.get(gate_type, {})
+		if table.is_empty():
+			continue
+
+		var gate_color: Color = ThemeManager.get_gate_color(gate_type)
+
+		var gate_lbl = Label.new()
+		gate_lbl.text = "-- %s GATE --" % gate_type
+		gate_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		gate_lbl.add_theme_color_override("font_color", gate_color)
+		gate_lbl.add_theme_font_size_override("font_size", 13)
+		vbox.add_child(gate_lbl)
+
+		var desc_lbl = Label.new()
+		desc_lbl.text = table["desc"]
+		desc_lbl.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
+		desc_lbl.add_theme_font_size_override("font_size", 11)
+		desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(desc_lbl)
+
+		var header_lbl = Label.new()
+		header_lbl.text = table["header"]
+		header_lbl.add_theme_color_override("font_color", ch_accent)
+		header_lbl.add_theme_font_size_override("font_size", 12)
+		header_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(header_lbl)
+
+		for row_text in table["rows"]:
+			var row_lbl = Label.new()
+			row_lbl.text = row_text
+			row_lbl.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
+			row_lbl.add_theme_font_size_override("font_size", 12)
+			row_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			vbox.add_child(row_lbl)
+
+		var gate_spacer = Control.new()
+		gate_spacer.custom_minimum_size = Vector2(0, 6)
+		vbox.add_child(gate_spacer)
+
+	var close_btn = Button.new()
+	close_btn.text = "CLOSE"
+	ThemeManager.create_primary_button(close_btn, 12, Vector2(100, 34))
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	close_btn.pressed.connect(func() -> void:
+		var anim_c = get_node_or_null("/root/AnimHelper")
+		if anim_c:
+			var tw_c = anim_c.pop_out(_truth_table_panel, 0.2)
+			await tw_c.finished
+		_truth_table_panel.visible = false
+	)
+	vbox.add_child(close_btn)
+
+	$CanvasLayer/MainUI.add_child(_truth_table_panel)
+
+	var anim_setup = get_node_or_null("/root/AnimHelper")
+	if anim_setup:
+		_setup_panel_close_hover.call_deferred(close_btn)
+
+# ===================================================================
+# HINT SYSTEM
+# ===================================================================
+
+func _on_hint_button_pressed() -> void:
+	var hints_arr: Array = level_data.get("hints", [])
+	if hints_arr.is_empty():
+		return
+	var sfx = get_node_or_null("/root/SFXManager")
+	if sfx:
+		sfx.play_button_press()
+
+	# First hint is free; subsequent hints require a rewarded ad
+	if _hints_revealed >= 1 and _hints_revealed < hints_arr.size():
+		var ad_mgr = get_node_or_null("/root/AdManager")
+		if ad_mgr and ad_mgr.is_rewarded_ready():
+			ad_mgr.show_rewarded(_reveal_next_hint)
+			return  # Wait for reward callback
+	# Free hint or no ad available — reveal directly
+	_reveal_next_hint()
+
+func _reveal_next_hint() -> void:
+	var hints_arr: Array = level_data.get("hints", [])
+	if _hints_revealed < hints_arr.size():
+		_hints_revealed += 1
+
+	# Rebuild hint panel with updated content
+	if _hint_panel:
+		_hint_panel.queue_free()
+		_hint_panel = null
+	_create_hint_panel()
+	_hint_panel.visible = true
+	var anim = get_node_or_null("/root/AnimHelper")
+	if anim:
+		anim.pop_in(_hint_panel, 0.3)
+
+	# Update button text
+	if _hint_btn:
+		_hint_btn.text = "HINT %d/%d" % [_hints_revealed, hints_arr.size()]
+
+func _create_hint_panel() -> void:
+	var hints_arr: Array = level_data.get("hints", [])
+
+	_hint_panel = PanelContainer.new()
+	_hint_panel.name = "HintPanel"
+	_hint_panel.anchor_left = 0.5
+	_hint_panel.anchor_top = 0.5
+	_hint_panel.anchor_right = 0.5
+	_hint_panel.anchor_bottom = 0.5
+	var panel_h: int = 100 + _hints_revealed * 40
+	_hint_panel.offset_left = -180
+	_hint_panel.offset_top = -panel_h / 2.0
+	_hint_panel.offset_right = 180
+	_hint_panel.offset_bottom = panel_h / 2.0
+	_hint_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var hint_accent = Color(0.85, 0.65, 0.1)
+	var bg_style = ThemeManager.create_glass_panel(hint_accent, 12, 2)
+	bg_style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
+	bg_style.shadow_size = 12
+	_hint_panel.add_theme_stylebox_override("panel", bg_style)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 20)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	_hint_panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "HINTS (%d/%d)" % [_hints_revealed, hints_arr.size()]
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_color_override("font_color", hint_accent)
+	title_lbl.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(title_lbl)
+
+	var div = ThemeManager.create_glow_divider(hint_accent, 160.0)
+	vbox.add_child(div)
+
+	for i in range(_hints_revealed):
+		var hint_lbl = Label.new()
+		hint_lbl.text = ">> " + hints_arr[i]
+		hint_lbl.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
+		hint_lbl.add_theme_font_size_override("font_size", 12)
+		hint_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		hint_lbl.custom_minimum_size = Vector2(300, 0)
+		vbox.add_child(hint_lbl)
+
+	if _hints_revealed < hints_arr.size():
+		var more_lbl = Label.new()
+		more_lbl.text = "Click HINT again for next hint..."
+		more_lbl.add_theme_color_override("font_color", ThemeManager.TEXT_MUTED)
+		more_lbl.add_theme_font_size_override("font_size", 11)
+		more_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(more_lbl)
+
+	var close_btn = Button.new()
+	close_btn.text = "GOT IT"
+	ThemeManager.create_primary_button(close_btn, 12, Vector2(100, 34))
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	close_btn.pressed.connect(func() -> void:
+		var anim_c = get_node_or_null("/root/AnimHelper")
+		if anim_c:
+			var tw_c = anim_c.pop_out(_hint_panel, 0.2)
+			await tw_c.finished
+		_hint_panel.visible = false
+	)
+	vbox.add_child(close_btn)
+
+	$CanvasLayer/MainUI.add_child(_hint_panel)
+
+	var anim_setup = get_node_or_null("/root/AnimHelper")
+	if anim_setup:
+		_setup_panel_close_hover.call_deferred(close_btn)
+
+# ===================================================================
+# ACHIEVEMENT POPUPS
+# ===================================================================
+
+func _check_achievements() -> void:
+	var newly_unlocked: Array[String] = Global.check_and_unlock_achievements()
+	for ach_id in newly_unlocked:
+		await _show_achievement_popup(ach_id)
+
+func _show_achievement_popup(ach_id: String) -> void:
+	var ach: Dictionary = Global.ACHIEVEMENT_DEFS.get(ach_id, {})
+	if ach.is_empty():
+		return
+
+	var popup = PanelContainer.new()
+	popup.name = "AchievementPopup"
+	popup.anchor_left = 1.0
+	popup.anchor_top = 0.0
+	popup.anchor_right = 1.0
+	popup.anchor_bottom = 0.0
+	popup.offset_left = -290
+	popup.offset_top = 10
+	popup.offset_right = -10
+	popup.offset_bottom = 74
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var style = ThemeManager.create_glass_panel(ThemeManager.ACCENT_WARNING, 10, 2)
+	style.shadow_size = 10
+	popup.add_theme_stylebox_override("panel", style)
+
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 10)
+	popup.add_child(hbox)
+
+	var trophy_lbl = Label.new()
+	trophy_lbl.text = "★"
+	trophy_lbl.add_theme_font_size_override("font_size", 28)
+	trophy_lbl.add_theme_color_override("font_color", ThemeManager.ACCENT_WARNING)
+	hbox.add_child(trophy_lbl)
+
+	var text_vbox = VBoxContainer.new()
+	text_vbox.add_theme_constant_override("separation", 2)
+	hbox.add_child(text_vbox)
+
+	var header_lbl = Label.new()
+	header_lbl.text = "ACHIEVEMENT UNLOCKED!"
+	header_lbl.add_theme_color_override("font_color", ThemeManager.ACCENT_WARNING)
+	header_lbl.add_theme_font_size_override("font_size", 11)
+	text_vbox.add_child(header_lbl)
+
+	var name_lbl = Label.new()
+	name_lbl.text = ach["title"]
+	name_lbl.add_theme_color_override("font_color", ThemeManager.TERMINAL_WHITE)
+	name_lbl.add_theme_font_size_override("font_size", 14)
+	text_vbox.add_child(name_lbl)
+
+	$CanvasLayer/MainUI.add_child(popup)
+
+	# Slide in from right
+	popup.modulate.a = 0.0
+	var target_left: float = popup.offset_left
+	var target_right: float = popup.offset_right
+	popup.offset_left = -10
+	popup.offset_right = 270
+
+	var tw = popup.create_tween().set_parallel(true)
+	tw.tween_property(popup, "modulate:a", 1.0, 0.3)
+	tw.tween_property(popup, "offset_left", target_left, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(popup, "offset_right", target_right, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await tw.finished
+
+	# Hold then fade out
+	await get_tree().create_timer(2.5).timeout
+	var tw2 = popup.create_tween()
+	tw2.tween_property(popup, "modulate:a", 0.0, 0.5)
+	await tw2.finished
+	popup.queue_free()
+
+# ===================================================================
+# SHARED PANEL HELPERS
+# ===================================================================
+
+func _setup_panel_close_hover(btn: Button) -> void:
+	var anim_h = get_node_or_null("/root/AnimHelper")
+	if anim_h and btn and btn.is_inside_tree():
+		anim_h.setup_button_hover(btn)

@@ -112,7 +112,6 @@ func get_camera_zoom() -> Vector2:
 	return Vector2(z, z)
 
 func get_camera_center() -> Vector2:
-	var _vp: Vector2 = get_viewport().get_visible_rect().size
 	var z: float = get_camera_zoom().x
 
 	# Board content center in world coordinates

@@ -266,7 +266,6 @@ func _create_vignette() -> ColorRect:
 	v.anchor_bottom = 1.0
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.color = Color(0, 0, 0, 0)
-	# Use a gradient shader for vignette
 	var mat = ShaderMaterial.new()
 	var shader = Shader.new()
 	shader.code = """
@@ -282,3 +281,131 @@ void fragment() {
 	v.material = mat
 	v.name = "Vignette"
 	return v
+
+# --- CONFETTI BURST (multi-colored rectangles + rotation) ---
+
+func confetti_burst(parent: Control, center: Vector2, count: int = 40) -> void:
+	var confetti_colors = [
+		Color(0.0, 0.9, 0.9, 1.0),   # Cyan
+		Color(1.0, 0.8, 0.1, 1.0),   # Gold
+		Color(0.4, 0.9, 0.4, 1.0),   # Green
+		Color(0.8, 0.3, 0.9, 1.0),   # Purple
+		Color(1.0, 0.4, 0.5, 1.0),   # Pink
+		Color(0.3, 0.5, 1.0, 1.0),   # Blue
+	]
+	for i in range(count):
+		var piece = ColorRect.new()
+		var w = randf_range(4, 10)
+		var h = randf_range(2, 6)
+		piece.size = Vector2(w, h)
+		piece.color = confetti_colors[i % confetti_colors.size()]
+		piece.position = center - Vector2(w / 2.0, h / 2.0)
+		piece.pivot_offset = Vector2(w / 2.0, h / 2.0)
+		piece.rotation = randf() * TAU
+		piece.modulate.a = 1.0
+		parent.add_child(piece)
+		# Physics-like arc: outward + gravity
+		var angle = randf() * TAU
+		var speed = randf_range(100, 280)
+		var target_x = center.x + cos(angle) * speed
+		var target_y = center.y + sin(angle) * speed * 0.5 + randf_range(80, 200)  # gravity pull
+		var duration = randf_range(0.8, 1.5)
+		var spin = randf_range(-6.0, 6.0)
+		var tw = piece.create_tween().set_parallel(true)
+		tw.tween_property(piece, "position:x", target_x, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(piece, "position:y", target_y, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(piece, "rotation", piece.rotation + spin, duration)
+		tw.tween_property(piece, "modulate:a", 0.0, duration * 0.4).set_delay(duration * 0.6)
+		tw.chain().tween_callback(piece.queue_free)
+
+# --- RIPPLE EFFECT (expanding concentric rings) ---
+
+func ripple_effect(parent: Control, center: Vector2, color: Color = Color(0, 0.85, 0.85, 1.0), rings: int = 3) -> void:
+	for i in range(rings):
+		var ring = _RippleRing.new(center, color, 80.0 + float(i) * 30.0)
+		parent.add_child(ring)
+		# Stagger the rings
+		var tw = ring.create_tween()
+		tw.tween_interval(float(i) * 0.15)
+		tw.tween_callback(ring.start_animation)
+
+# --- GLOW CARD HOVER (enhanced hover with border glow tween) ---
+
+func card_hover_enter(panel: PanelContainer, hover_style: StyleBoxFlat, base_scale: float = 1.05) -> void:
+	panel.pivot_offset = panel.size / 2.0
+	panel.add_theme_stylebox_override("panel", hover_style)
+	var tw = panel.create_tween().set_parallel(true)
+	tw.tween_property(panel, "scale", Vector2(base_scale, base_scale), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func card_hover_exit(panel: PanelContainer, normal_style: StyleBoxFlat) -> void:
+	panel.add_theme_stylebox_override("panel", normal_style)
+	var tw = panel.create_tween()
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+# --- COUNTER ANIMATION (number counting up) ---
+
+func count_up(label: Label, from_val: int, to_val: int, duration: float = 0.8, prefix: String = "", suffix: String = "") -> Tween:
+	var tw = label.create_tween()
+	tw.tween_method(func(v: float) -> void:
+		label.text = "%s%d%s" % [prefix, int(v), suffix]
+	, float(from_val), float(to_val), duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	return tw
+
+# --- PROGRESS BAR FILL ANIMATION ---
+
+func animate_progress(bar: ProgressBar, to_val: float, duration: float = 0.6) -> Tween:
+	var tw = bar.create_tween()
+	tw.tween_property(bar, "value", to_val, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	return tw
+
+# --- GLOW TEXT (slow breathing glow on a label) ---
+
+func glow_text(label: Label, base_color: Color, glow_factor: float = 1.4) -> Tween:
+	var glow_color = Color(base_color.r * glow_factor, base_color.g * glow_factor, base_color.b * glow_factor, 1.0)
+	label.add_theme_color_override("font_color", base_color)
+	var tw = label.create_tween().set_loops(0)
+	tw.tween_method(func(t: float) -> void:
+		var c = base_color.lerp(glow_color, t)
+		label.add_theme_color_override("font_color", c)
+	, 0.0, 1.0, 1.2).set_trans(Tween.TRANS_SINE)
+	tw.tween_method(func(t: float) -> void:
+		var c = glow_color.lerp(base_color, t)
+		label.add_theme_color_override("font_color", c)
+	, 0.0, 1.0, 1.2).set_trans(Tween.TRANS_SINE)
+	return tw
+
+# --- Internal: Ripple ring node ---
+
+class _RippleRing extends Node2D:
+	var _center: Vector2
+	var _color: Color
+	var _max_radius: float
+	var _started: bool = false
+	var _elapsed: float = 0.0
+	var _duration: float = 0.7
+
+	func _init(center: Vector2, color: Color, max_r: float) -> void:
+		_center = center
+		_color = color
+		_max_radius = max_r
+
+	func start_animation() -> void:
+		_started = true
+
+	func _process(delta: float) -> void:
+		if not _started:
+			return
+		_elapsed += delta
+		if _elapsed >= _duration:
+			queue_free()
+			return
+		queue_redraw()
+
+	func _draw() -> void:
+		if not _started:
+			return
+		var t = _elapsed / _duration
+		var radius = _max_radius * t
+		var alpha = (1.0 - t) * 0.5
+		var c = Color(_color.r, _color.g, _color.b, alpha)
+		draw_arc(_center, radius, 0, TAU, 48, c, 2.0)

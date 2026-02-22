@@ -9,6 +9,10 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	# Block drops during tutorial when input is blocked
+	var level_mgr = get_tree().get_first_node_in_group("level_manager") as LevelManager
+	if level_mgr and level_mgr._input_blocked and not level_mgr._tutorial_complete:
+		return false
 	if data is Dictionary:
 		return data.has("type") and data["type"] == "gate" and data.has("gate_type")
 	return false

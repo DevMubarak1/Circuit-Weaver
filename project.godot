@@ -11,10 +11,10 @@ config_version=5
 [application]
 
 config/name="Circuit Weaver"
-config/version="0.1.0"
+config/version="1.0.0"
 run/main_scene="res://scenes/intro.tscn"
 config/features=PackedStringArray("4.5")
-config/icon="res://assets/icon.svg"
+config/icon="res://assets/icon_192.png"
 
 [autoload]
 
@@ -24,6 +24,7 @@ SFXManager="*res://scripts/sfx_manager.gd"
 MusicManager="*res://scripts/music_manager.gd"
 ResponsiveManager="*res://scripts/responsive_manager.gd"
 AnimHelper="*res://scripts/anim_helper.gd"
+AdManager="*res://scripts/ad_manager.gd"
 
 [display]
 
@@ -31,7 +32,14 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/vsync/vsync_mode=0
 
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.028, 0.035, 0.058, 1)
+2d/snap/snap_2d_transforms_to_pixel=true

@@ -10,7 +10,10 @@ var notification_label: Label
 
 func _ready():
 	await get_tree().process_frame
-	
+
+	# Aurora background for visual depth
+	ThemeManager.create_aurora_bg(self)
+
 	create_notification_panel()
 	_apply_responsive_layout()
 	apply_profile_styling()
@@ -39,11 +42,7 @@ func _on_initialize_button_pressed():
 	
 	Global.user_name = architect_name
 	Global.user_age = architect_age
-
-	var config = ConfigFile.new()
-	config.set_value("Architect", "name", architect_name)
-	config.set_value("Architect", "age", architect_age)
-	config.save("user://architect_data.cfg")
+	Global.save_progress()
 
 	get_tree().change_scene_to_file("res://scenes/level_select.tscn")
 
@@ -58,16 +57,15 @@ func create_notification_panel() -> void:
 	notification_panel.visible = false
 	
 	var warning_style = StyleBoxFlat.new()
-	warning_style.bg_color = Color(2.0, 1.0, 0.0, 0.9)  # Cyber Pink HDR warning
-	warning_style.border_width_left = 2
-	warning_style.border_width_right = 2
-	warning_style.border_width_top = 2
-	warning_style.border_width_bottom = 2
-	warning_style.border_color = Color(2.0, 1.5, 0.5, 1.0)  # Orange border
-	warning_style.corner_radius_top_left = 6
-	warning_style.corner_radius_top_right = 6
-	warning_style.corner_radius_bottom_left = 6
-	warning_style.corner_radius_bottom_right = 6
+	warning_style.bg_color = Color(0.15, 0.08, 0.02, 0.92)  # Deep amber glass
+	warning_style.border_width_left = 3
+	warning_style.border_width_right = 1
+	warning_style.border_width_top = 1
+	warning_style.border_width_bottom = 1
+	warning_style.border_color = Color(1.0, 0.7, 0.2, 0.8)
+	ThemeManager._apply_radius(warning_style, 8)
+	warning_style.shadow_color = Color(1.0, 0.6, 0.0, 0.2)
+	warning_style.shadow_size = 6
 	notification_panel.add_theme_stylebox_override("panel", warning_style)
 	
 	var margin = MarginContainer.new()
@@ -80,7 +78,7 @@ func create_notification_panel() -> void:
 	notification_label = Label.new()
 	notification_label.text = "Validation Error"
 	notification_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	notification_label.add_theme_color_override("font_color", Color(0.1, 0.1, 0.1, 1.0))  # Dark text
+	notification_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))  # Amber text on dark
 	notification_label.add_theme_font_size_override("font_size", 18)
 	margin.add_child(notification_label)
 	

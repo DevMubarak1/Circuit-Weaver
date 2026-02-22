@@ -62,14 +62,14 @@ func _ready() -> void:
 
 func get_gate_svg_path(gate: String) -> String:
 	match gate:
-		"AND":  return "res://assets/AND_ANSI.svg"
-		"OR":   return "res://assets/OR_ANSI.svg"
-		"NOT":  return "res://assets/NOT_ANSI.svg"
-		"XOR":  return "res://assets/XOR_ANSI.svg"
-		"NAND": return "res://assets/NAND_ANSI.svg"
-		"NOR":  return "res://assets/NOR_ANSI.svg"
-		"XNOR": return "res://assets/XNOR_ANSI.svg"
-		_:      return "res://assets/AND_ANSI.svg"
+		"AND":  return "res://assets/and-whiteansi.svg"
+		"OR":   return "res://assets/or-whiteansi.svg"
+		"NOT":  return "res://assets/not-whiteansi.svg"
+		"XOR":  return "res://assets/xor-whiteansi.svg"
+		"NAND": return "res://assets/nand-whiteansi.svg"
+		"NOR":  return "res://assets/nor-whiteansi.svg"
+		"XNOR": return "res://assets/xnor-whiteansi.svg"
+		_:      return "res://assets/and-whiteansi.svg"
 
 func _build_tooltip_text() -> String:
 	var table: Dictionary = TRUTH_TABLES.get(gate_type, {})
@@ -127,6 +127,14 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		self_modulate = ThemeManager.SIGNAL_ACTIVE
+		modulate = Color(1.5, 1.5, 1.5)
+		gate_clicked.emit(gate_type)
+		var sfx = get_node_or_null("/root/SFXManager")
+		if sfx:
+			sfx.play_button_press()
+	elif event is InputEventScreenTouch and event.pressed:
+		# Touch tap — also emit gate_clicked for tap-to-place on mobile
 		self_modulate = ThemeManager.SIGNAL_ACTIVE
 		modulate = Color(1.5, 1.5, 1.5)
 		gate_clicked.emit(gate_type)

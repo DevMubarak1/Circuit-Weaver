@@ -12,7 +12,6 @@ var gates: Dictionary = {}
 var wires: Array[Wire] = []
 var input_nodes: Array[InputNode] = []
 var output_nodes: Array[OutputNode] = []
-var next_gate_column: int = 2
 var total_gates_to_place: int = 0
 var gates_placed: int = 0
 
@@ -24,7 +23,19 @@ var dragging_gate: LogicGate = null
 var drag_offset: Vector2 = Vector2.ZERO
 var _touch_active: bool = false
 var current_selected_gate: LogicGate = null
+var _current_selected_wire: Wire = null
 var context_menu: PopupMenu = null
+
+# --- TOUCH / PINCH-TO-ZOOM ---
+var _touch_points: Dictionary = {}  # finger_index -> position
+var _pinch_start_distance: float = 0.0
+var _pinch_start_zoom: Vector2 = Vector2.ONE
+var _pan_start_cam_pos: Vector2 = Vector2.ZERO
+var _pan_start_touch_center: Vector2 = Vector2.ZERO
+var _long_press_timer: Timer = null
+var _long_press_position: Vector2 = Vector2.ZERO
+const LONG_PRESS_DURATION: float = 0.5
+const LONG_PRESS_MOVE_THRESHOLD: float = 15.0
 
 signal simulation_started
 signal simulation_ended
@@ -212,9 +223,75 @@ func _input(event: InputEvent) -> void:
 			current_selected_gate = null
 		return
 
+	# --- PINCH-TO-ZOOM & TWO-FINGER PAN ---
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_touch_points[event.index] = event.position
+			if _touch_points.size() == 1 and event.index == 0:
+				# Start long-press timer for context menu
+				_long_press_position = event.position
+				_start_long_press_timer()
+			if _touch_points.size() == 2:
+				_cancel_long_press_timer()
+				var points = _touch_points.values()
+				_pinch_start_distance = points[0].distance_to(points[1])
+				var cam = get_parent().get_node_or_null("Camera2D") as Camera2D
+				if cam:
+					_pinch_start_zoom = cam.zoom
+					_pan_start_cam_pos = cam.position
+					_pan_start_touch_center = (points[0] + points[1]) / 2.0
+		else:
+			_touch_points.erase(event.index)
+			if event.index == 0:
+				_cancel_long_press_timer()
+
+	if event is InputEventScreenDrag:
+		_touch_points[event.index] = event.position
+		if _touch_points.size() == 2:
+			# Cancel any single-finger actions during pinch
+			_cancel_long_press_timer()
+			if dragging_gate:
+				dragging_gate = null
+			var points = _touch_points.values()
+			var current_distance = points[0].distance_to(points[1])
+			var cam = get_parent().get_node_or_null("Camera2D") as Camera2D
+			if cam and _pinch_start_distance > 10.0:
+				# Zoom
+				var zoom_factor = current_distance / _pinch_start_distance
+				var new_zoom = _pinch_start_zoom * zoom_factor
+				new_zoom = new_zoom.clamp(Vector2(0.3, 0.3), Vector2(2.5, 2.5))
+				cam.zoom = new_zoom
+				# Pan
+				var current_center = (points[0] + points[1]) / 2.0
+				var delta = (current_center - _pan_start_touch_center) / cam.zoom.x
+				cam.position = _pan_start_cam_pos - delta
+			return
+		elif _touch_points.size() == 1 and event.index == 0:
+			# Check if finger moved too far for long-press
+			if _long_press_position.distance_to(event.position) > LONG_PRESS_MOVE_THRESHOLD:
+				_cancel_long_press_timer()
+
+	# --- MOUSE SCROLL ZOOM (desktop + trackpad) ---
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			var cam = get_parent().get_node_or_null("Camera2D") as Camera2D
+			if cam:
+				var zoom_step: float = 0.1
+				if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+					cam.zoom += Vector2(zoom_step, zoom_step)
+				else:
+					cam.zoom -= Vector2(zoom_step, zoom_step)
+				cam.zoom = cam.zoom.clamp(Vector2(0.3, 0.3), Vector2(2.5, 2.5))
+			return
+
 	var pressed: bool = false
 	var released: bool = false
 	var is_right: bool = false
+
+	# Block board interactions during tutorial
+	var level_mgr = get_tree().get_first_node_in_group("level_manager") as LevelManager
+	if level_mgr and level_mgr._input_blocked and not level_mgr._tutorial_complete:
+		return
 
 	if event is InputEventMouseButton:
 		if event.pressed:
@@ -238,8 +315,6 @@ func _input(event: InputEvent) -> void:
 			if _handle_port_click(mouse_pos):
 				pass
 			elif _handle_gate_click(mouse_pos):
-				pass
-			else:
 				pass
 	elif released:
 		if dragging_gate:
@@ -314,9 +389,12 @@ func _process(_delta: float) -> void:
 	if dragging_gate and (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _touch_active):
 		dragging_gate.position = get_local_mouse_position() - drag_offset
 	
-	# Redraw for wiring preview
+	# Redraw for wiring preview only when actively wiring
 	if wiring_mode and selected_port:
 		queue_redraw()
+	elif not dragging_gate:
+		# Nothing active — no need to process every frame
+		return
 
 func place_gate(gate_type: String, _grid_position: Vector2i, world_position: Vector2 = Vector2.ZERO) -> LogicGate:
 	var placement_pos: Vector2
@@ -342,8 +420,6 @@ func place_gate(gate_type: String, _grid_position: Vector2i, world_position: Vec
 			sfx.play_gate_snap()
 		gate_placed.emit(gate_type, gate)
 		return gate
-	else:
-		pass
 	return null
 
 func create_gate_instance(g_type: String, grid_pos: Vector2i) -> LogicGate:
@@ -364,8 +440,6 @@ func create_gate_instance(g_type: String, grid_pos: Vector2i) -> LogicGate:
 			gate_label.add_theme_color_override("font_color", ThemeManager.SIGNAL_ACTIVE)
 			gate_label.add_theme_font_size_override("font_size", 14)
 			# Position set dynamically by _ensure_gate_ports based on actual texture size
-		else:
-			pass
 		var sprite_node = instance.get_node_or_null("Sprite2D")
 		if sprite_node:
 			sprite_node.z_index = 1
@@ -828,6 +902,12 @@ func _on_level_complete() -> void:
 	level_complete.emit()
 
 func _on_context_menu_selected(id: int) -> void:
+	if id == 10:  # Delete Wire
+		if _current_selected_wire and is_instance_valid(_current_selected_wire):
+			_delete_wire(_current_selected_wire)
+		_current_selected_wire = null
+		return
+
 	if not current_selected_gate:
 		return
 	
@@ -910,26 +990,100 @@ func clear_circuit() -> void:
 	is_simulating = false
 
 func _handle_right_click(mouse_pos: Vector2) -> void:
+	_show_gate_context_menu(mouse_pos)
+
+func _show_gate_context_menu(mouse_pos: Vector2) -> void:
 	var gate_clicked_flag = false
 	var click_radius = 110.0
+	var resp = get_node_or_null("/root/ResponsiveManager")
+	if resp and resp.is_mobile():
+		click_radius = 140.0
 	for gate in gates.values():
 		var gate_local_pos = to_local(gate.global_position)
 		var distance = mouse_pos.distance_to(gate_local_pos)
 		if distance < click_radius:
 			current_selected_gate = gate
-			if not context_menu:
-				context_menu = PopupMenu.new()
-				add_child(context_menu)
-				context_menu.connect("id_pressed", Callable(self, "_on_context_menu_selected"))
-				context_menu.add_item("Delete Gate", 0)
-				context_menu.add_item("Duplicate Gate", 1)
-				context_menu.add_item("Move Gate", 2)
+			_current_selected_wire = null
+			_rebuild_context_menu(true, false)
 			context_menu.popup(Rect2i(get_viewport().get_mouse_position(), Vector2i.ZERO))
 			gate_clicked_flag = true
 			break
 	if not gate_clicked_flag:
-		if wiring_mode:
+		# Check for nearby wires
+		var wire_hit_dist = 25.0
+		if resp and resp.is_mobile():
+			wire_hit_dist = 40.0
+		var closest_wire: Wire = null
+		var closest_dist: float = wire_hit_dist
+		for wire in wires:
+			if not wire or not is_instance_valid(wire):
+				continue
+			if not wire.from_port or not wire.to_port:
+				continue
+			var d = _point_to_wire_distance(mouse_pos, wire)
+			if d < closest_dist:
+				closest_dist = d
+				closest_wire = wire
+		if closest_wire:
+			_current_selected_wire = closest_wire
+			current_selected_gate = null
+			_rebuild_context_menu(false, true)
+			context_menu.popup(Rect2i(get_viewport().get_mouse_position(), Vector2i.ZERO))
+		elif wiring_mode:
 			cancel_wiring()
+
+func _rebuild_context_menu(for_gate: bool, for_wire: bool) -> void:
+	if context_menu and is_instance_valid(context_menu):
+		context_menu.queue_free()
+		context_menu = null
+	context_menu = PopupMenu.new()
+	add_child(context_menu)
+	context_menu.connect("id_pressed", Callable(self, "_on_context_menu_selected"))
+	if for_gate:
+		context_menu.add_item("Delete Gate", 0)
+		context_menu.add_item("Duplicate Gate", 1)
+		context_menu.add_item("Move Gate", 2)
+	if for_wire:
+		context_menu.add_item("Delete Wire", 10)
+
+func _point_to_wire_distance(point: Vector2, wire: Wire) -> float:
+	# Calculate min distance from point to the wire's polyline segments
+	var start_pos = to_local(wire.from_port.global_position)
+	var end_pos = to_local(wire.to_port.global_position)
+	var mid_x = (start_pos.x + end_pos.x) / 2.0
+	var segments: Array[Vector2] = [
+		start_pos,
+		Vector2(mid_x, start_pos.y),
+		Vector2(mid_x, end_pos.y),
+		end_pos,
+	]
+	var min_dist = INF
+	for i in range(segments.size() - 1):
+		var d = _point_to_segment(point, segments[i], segments[i + 1])
+		min_dist = minf(min_dist, d)
+	return min_dist
+
+func _point_to_segment(point: Vector2, seg_a: Vector2, seg_b: Vector2) -> float:
+	var ab = seg_b - seg_a
+	var ap = point - seg_a
+	var len_sq = ab.length_squared()
+	if len_sq < 0.001:
+		return point.distance_to(seg_a)
+	var t = clampf(ap.dot(ab) / len_sq, 0.0, 1.0)
+	var closest = seg_a + ab * t
+	return point.distance_to(closest)
+
+func _delete_wire(wire: Wire) -> void:
+	if wire.from_port and wire.from_port.has_meta("connected_wire"):
+		if wire.from_port.get_meta("connected_wire") == wire:
+			wire.from_port.remove_meta("connected_wire")
+	if wire.to_port and wire.to_port.has_meta("connected_wire"):
+		if wire.to_port.get_meta("connected_wire") == wire:
+			wire.to_port.remove_meta("connected_wire")
+	wires.erase(wire)
+	wire.queue_free()
+	if is_simulating:
+		end_simulation()
 
 # --- DRAG AND DROP ---
 
@@ -943,3 +1097,28 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 		var gate_type: String = data["gate_type"]
 		var local_pos = get_local_mouse_position()
 		place_gate(gate_type, Vector2i.ZERO, local_pos)
+
+# --- LONG-PRESS HELPERS (mobile context menu) ---
+
+func _start_long_press_timer() -> void:
+	_cancel_long_press_timer()
+	_long_press_timer = Timer.new()
+	_long_press_timer.one_shot = true
+	_long_press_timer.wait_time = LONG_PRESS_DURATION
+	_long_press_timer.timeout.connect(_on_long_press_timeout)
+	add_child(_long_press_timer)
+	_long_press_timer.start()
+
+func _cancel_long_press_timer() -> void:
+	if _long_press_timer and is_instance_valid(_long_press_timer):
+		_long_press_timer.stop()
+		_long_press_timer.queue_free()
+		_long_press_timer = null
+
+func _on_long_press_timeout() -> void:
+	# Long press triggers context menu (same as right-click)
+	var mouse_pos = get_local_mouse_position()
+	_show_gate_context_menu(mouse_pos)
+	# Cancel any dragging to prevent accidental moves
+	if dragging_gate:
+		dragging_gate = null

@@ -1,3 +1,8 @@
+
+![Circuit Weaver Logo](assets/circuit%20weaver.png)
+
+![CW App Icon](assets/icon_192.png)
+
 # Circuit Weaver
 
 A digital logic puzzle game built with Godot 4.5. You learn how computers actually work — by building circuits with real logic gates.
@@ -34,7 +39,35 @@ Each chapter unlocks after completing the previous chapter's final level.
 - **Engine**: Godot 4.5 (GDScript)
 - **Renderer**: Forward+
 - **Resolution**: 1280x720, scales to any aspect ratio
-- **Platforms**: Windows, Linux, macOS, Web (planned)
+- **Platforms**: Windows, Linux, macOS, Android, Web
+- **Website**: Next.js 15, Tailwind CSS v4, Framer Motion
+
+## Website
+
+Circuit Weaver has a marketing website built with Next.js. It includes:
+
+- Interactive logic gate demo you can play right on the homepage
+- Animated text reveals, bento grid feature cards, tab-based gate explorer
+- Fully responsive design for mobile, tablet, and desktop
+- Embedded game player at `/play` — no download required
+- Space Grotesk + JetBrains Mono typography
+
+To run the website locally:
+
+```bash
+cd website
+npm install
+npm run dev
+```
+
+## Ads & Monetization
+
+The mobile (Android) version includes non-intrusive ads to help fund development:
+
+- **Interstitial ads** — shown occasionally between levels (not every level)
+- **Rewarded ads** — optionally watch an ad to unlock extra hints
+
+The desktop and web versions are completely ad-free.
 
 ## Project Structure
 
@@ -51,9 +84,12 @@ scripts/               — all game logic (GDScript)
 scenes/                — Godot scene files (.tscn)
 assets/                — gate SVG icons, background art
 shaders/               — circuit background, wire pulse, glitch transition
+website/               — Next.js marketing site
+  src/app/             — pages (home, play)
+  src/components/      — UI components (Hero, Features, Gates, etc.)
 ```
 
-## Running It
+## Running the Game
 
 1. Install [Godot 4.5+](https://godotengine.org/download)
 2. Clone this repo
@@ -62,7 +98,7 @@ shaders/               — circuit background, wire pulse, glitch transition
 
 ## Learning
 
-Check out [learn.md](learn.md) for a plain-language walkthrough of every logic gate and what each chapter teaches you. No emojis, no fluff — just the concepts explained like a person would explain them.
+Check out [learn.md](learn.md) for a plain-language walkthrough of every logic gate and what each chapter teaches you.
 
 ## License
 

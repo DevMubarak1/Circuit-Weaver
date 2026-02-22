@@ -10,20 +10,16 @@ signal gate_activated
 
 var input_slots: Dictionary = {}  # Maps input_index -> value
 var output_value: int = 0
-var is_hovering: bool = false
 @onready var sprite: Sprite2D = $Sprite2D
 var input_ports: Node2D
 var output_port: Area2D
 var connected_output_wires: Array[Wire] = []
 var _propagation_depth: int = 0
 const MAX_PROPAGATION_DEPTH: int = 50
-var background: ColorRect
-var gate_body: Area2D  # Reference to collision body
 
 func _ready() -> void:
 	input_ports = get_node_or_null("InputPorts")
 	output_port = get_node_or_null("OutputPort")
-	gate_body = self  # Root node is Area2D
 	set_process_input(true)
 	# Only reload icon if not already loaded (create_gate_instance may have loaded it)
 	if sprite and not sprite.texture:

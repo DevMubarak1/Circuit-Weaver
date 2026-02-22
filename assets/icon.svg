@@ -1,31 +1,18 @@
 <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="128" height="128" fill="#1a1a2e"/>
-  
-  <!-- Grid -->
-  <line x1="32" y1="0" x2="32" y2="128" stroke="#16213e" stroke-width="1"/>
-  <line x1="64" y1="0" x2="64" y2="128" stroke="#16213e" stroke-width="1"/>
-  <line x1="96" y1="0" x2="96" y2="128" stroke="#16213e" stroke-width="1"/>
-  <line x1="0" y1="32" x2="128" y2="32" stroke="#16213e" stroke-width="1"/>
-  <line x1="0" y1="64" x2="128" y2="64" stroke="#16213e" stroke-width="1"/>
-  <line x1="0" y1="96" x2="128" y2="96" stroke="#16213e" stroke-width="1"/>
-  
-  <!-- Input Node (left) -->
-  <circle cx="20" cy="64" r="8" fill="#00d4ff" stroke="#0099cc" stroke-width="2"/>
-  <text x="20" y="68" font-size="6" fill="white" text-anchor="middle" font-weight="bold">A</text>
-  
-  <!-- AND Gate (center-left) -->
-  <rect x="48" y="48" width="20" height="32" fill="#ff3333" stroke="#cc0000" stroke-width="2" rx="3"/>
-  <text x="58" y="68" font-size="8" fill="white" text-anchor="middle" font-weight="bold">AND</text>
-  
-  <!-- Output Node (right) -->
-  <circle cx="108" cy="64" r="8" fill="#ffff00" stroke="#cccc00" stroke-width="2"/>
-  <text x="108" y="68" font-size="6" fill="black" text-anchor="middle" font-weight="bold">O</text>
-  
-  <!-- Wire lines -->
-  <line x1="28" y1="64" x2="48" y2="64" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
-  <line x1="68" y1="64" x2="100" y2="64" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
-  
-  <!-- Glow effect -->
-  <circle cx="108" cy="64" r="10" fill="none" stroke="#ffff00" stroke-width="1" opacity="0.4"/>
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0B0E14"/>
+      <stop offset="100%" style="stop-color:#151A24"/>
+    </linearGradient>
+    <linearGradient id="cyan-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00F5FF"/>
+      <stop offset="100%" style="stop-color:#6699FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="url(#bg-grad)"/>
+  <line x1="10" y1="32" x2="30" y2="32" stroke="#00F5FF" stroke-width="1.5" opacity="0.2"/>
+  <line x1="98" y1="96" x2="118" y2="96" stroke="#6699FF" stroke-width="1.5" opacity="0.2"/>
+  <circle cx="30" cy="32" r="2" fill="#00F5FF" opacity="0.3"/>
+  <circle cx="98" cy="96" r="2" fill="#6699FF" opacity="0.3"/>
+  <text x="64" y="82" text-anchor="middle" font-family="monospace, 'Courier New'" font-weight="bold" font-size="56" fill="url(#cyan-grad)">CW</text>
 </svg>

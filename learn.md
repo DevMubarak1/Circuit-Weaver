@@ -132,3 +132,9 @@ When you play Circuit Weaver, you're not just solving puzzles. You're learning t
 - Count your wires. Every input port on a gate needs a wire. Every output needs to go somewhere. Missing a connection is the most common mistake.
 - Don't overthink it. The early levels are supposed to be simple. If your solution feels complicated, there's probably a simpler path.
 - Run the simulation even if you think it's wrong. Watching signals flow teaches you more than staring at the board.
+
+---
+
+## Play Online
+
+You don't need to install anything to try Circuit Weaver. Visit the website and play directly in your browser at `/play`. The full game runs in a web export — same 20 levels, same scoring, same experience.

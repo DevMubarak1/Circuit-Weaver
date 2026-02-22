@@ -16,6 +16,8 @@ func _ready() -> void:
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		_skip_pressed = true
+	if event is InputEventScreenTouch and event.pressed:
+		_skip_pressed = true
 
 func _build_cinematic_intro() -> void:
 	var anim = get_node_or_null("/root/AnimHelper")
@@ -39,9 +41,12 @@ func _build_cinematic_intro() -> void:
 	var gradient_overlay = ColorRect.new()
 	gradient_overlay.anchor_right = 1.0
 	gradient_overlay.anchor_bottom = 1.0
-	gradient_overlay.color = Color(0.03, 0.04, 0.06, 0.65)
+	gradient_overlay.color = Color(0.03, 0.04, 0.06, 0.55)
 	gradient_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(gradient_overlay)
+
+	# Aurora background layer for depth
+	ThemeManager.create_aurora_bg(self)
 
 	# Animated circuit background effect on top
 	if anim:
@@ -97,11 +102,8 @@ func _build_cinematic_intro() -> void:
 	_title_label.modulate.a = 0.0
 	center_box.add_child(_title_label)
 
-	# Decorative divider line
-	var divider = ColorRect.new()
-	divider.custom_minimum_size = Vector2(int(280 * ui_scale), int(2 * ui_scale))
-	divider.color = Color(0.0, 0.9, 0.9, 0.5)
-	divider.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# Decorative glow divider line
+	var divider = ThemeManager.create_glow_divider(Color(0.0, 0.9, 0.9, 1.0), int(280 * ui_scale))
 	divider.modulate.a = 0.0
 	center_box.add_child(divider)
 
@@ -185,6 +187,9 @@ func _build_cinematic_intro() -> void:
 	if anim:
 		var center_pt = Vector2(vp_size.x / 2.0, vp_size.y / 2.0 - 20)
 		anim.spawn_particles(self, center_pt, Color(0.0, 1.0, 1.0, 1.0), 35)
+		anim.confetti_burst(self, center_pt, 30)
+		# Glowing title breathing effect
+		anim.glow_text(_title_label, Color(0.0, 0.9, 0.9, 1.0), 1.4)
 
 	await get_tree().create_timer(1.5).timeout
 	_navigate_next()

@@ -1,7 +1,6 @@
 # Manages screen transitions between levels/chapters
-# Add as autoload: TransitionManager
+# Autoloaded as: TransitionMgr
 extends CanvasLayer
-class_name TransitionManager
 
 var _overlay: ColorRect
 var _shader_mat: ShaderMaterial

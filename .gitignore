@@ -14,6 +14,10 @@
 *.stex
 *.ctex
 
+# ===== Android =====
+# Godot Android build output and generated files
+android/
+
 # ===== Godot Exports =====
 # Build outputs and export templates
 *.exe
@@ -34,6 +38,34 @@ export_presets.cfg.backup
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# ===== Explicit Files =====
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.example
+.DS_Store
+node_modules/
+.next/
+.vscode/
+.idea/
+*.log
+*.bak
+*.tmp
+.history
+.sass-cache
+dist/
+build/
+coverage/
+test-results/
+yarn.lock
+package-lock.json
+npm-debug.log
+.expo/
+.expo-shared/
+.firebase/
 $RECYCLE.BIN/
 
 # macOS
@@ -71,6 +103,32 @@ $RECYCLE.BIN/
 
 # ===== Logs & Temp =====
 *.log
+
+# ===== Keystore & Signing Files =====
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.crt
+*.key
+*.cert
+*.der
+*.csr
+*.srl
+*.pub
+*.gpg
+*.asc
+*.enc
+*.sig
+*.p7b
+*.p7c
+*.p8
+*.p10
+*.spc
+*.pvk
+*.cer
+*.store
 *.tmp
 *.bak
 *.swp
@@ -81,4 +139,20 @@ $RECYCLE.BIN/
 *.blend
 *.blend1
 *.kra
-./update-git.bat
+/update-git.bat
+package-lock.json
+
+# ===== Ad ====
+
+scripts/ad_config.gd
+scripts/ad_config.gd.uid
+
+# ===== Website (Next.js) =====
+website/node_modules/
+website/.next/
+website/out/
+website/.vercel
+website/.env*
+website/*.tsbuildinfo
+website/next-env.d.ts
+website/package-lock.json

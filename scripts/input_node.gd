@@ -10,15 +10,12 @@ var current_index: int = 0
 var output_value: int = 1
 var connected_wires: Array[Wire] = []
 var label: Label
-var sprite: Sprite2D
 var output_port: Area2D
-var sequence: Array[int] = []
 
 signal output_changed(value: int)
 
 func _ready() -> void:
 	label = get_node_or_null("Label")
-	sprite = get_node_or_null("Sprite2D")
 	output_port = get_node_or_null("OutputPort")
 	
 	if label:
@@ -59,7 +56,6 @@ func reset() -> void:
 	output_value = signal_sequence[0]
 
 func set_binary_sequence(seq: Array[int]) -> void:
-	sequence = seq
 	signal_sequence = PackedInt32Array(seq)
 	output_value = signal_sequence[0]
 	current_index = 0
