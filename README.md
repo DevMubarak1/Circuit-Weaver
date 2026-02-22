@@ -1,8 +1,3 @@
-
-![Circuit Weaver Logo](assets/circuit%20weaver.png)
-
-![CW App Icon](assets/icon_192.png)
-
 # Circuit Weaver
 
 A digital logic puzzle game built with Godot 4.5. You learn how computers actually work — by building circuits with real logic gates.
