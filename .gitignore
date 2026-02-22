@@ -25,7 +25,6 @@ android/
 *.x86_32
 *.apk
 *.aab
-*.pck
 *.zip
 
 # Export presets (may contain signing keys / passwords)
