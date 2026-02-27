@@ -166,7 +166,3 @@ website/.env*
 website/*.tsbuildinfo
 website/next-env.d.ts
 website/package-lock.json
-website/public/game/*.wasm
-website/public/game/*.pck
-website/public/game/*.js
-website/public/game/*.png
