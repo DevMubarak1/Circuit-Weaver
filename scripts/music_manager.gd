@@ -86,6 +86,7 @@ const CHAPTER_DATA: Array[Dictionary] = [
 ]
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_pad_player = _create_player("PadPlayer")
 	_bass_player = _create_player("BassPlayer")
 	_arp_player = _create_player("ArpPlayer")
@@ -101,6 +102,8 @@ func _create_player(pname: String) -> AudioStreamPlayer:
 	return p
 
 func _process(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	if not _playing or not music_enabled:
 		return
 
@@ -245,7 +248,7 @@ func _play_pad_chord(data: Dictionary) -> void:
 	stream.loop_end = num_samples - int(SAMPLE_RATE * 0.6)
 
 	_pad_player.stream = stream
-	_pad_player.volume_db = linear_to_db(music_volume * 0.75)
+	_pad_player.volume_db = _safe_linear_to_db(music_volume * 0.75)
 	_pad_player.play()
 
 # --- BASS ---
@@ -277,7 +280,7 @@ func _play_bass_note(data: Dictionary) -> void:
 	stream.data = buf
 
 	_bass_player.stream = stream
-	_bass_player.volume_db = linear_to_db(music_volume * 0.55)
+	_bass_player.volume_db = _safe_linear_to_db(music_volume * 0.55)
 	_bass_player.play()
 
 # --- ARPEGGIO ---
@@ -318,7 +321,7 @@ func _play_arp_note(data: Dictionary) -> void:
 	stream.data = buf
 
 	_arp_player.stream = stream
-	_arp_player.volume_db = linear_to_db(music_volume * 0.5)
+	_arp_player.volume_db = _safe_linear_to_db(music_volume * 0.5)
 	_arp_player.play()
 
 # --- PERCUSSION ---
@@ -345,7 +348,7 @@ func _play_perc_tick() -> void:
 	stream.data = buf
 
 	_perc_player.stream = stream
-	_perc_player.volume_db = linear_to_db(music_volume * 0.3)
+	_perc_player.volume_db = _safe_linear_to_db(music_volume * 0.3)
 	_perc_player.play()
 
 # --- AMBIENT TEXTURE ---
@@ -385,10 +388,14 @@ func _play_ambient_texture(data: Dictionary) -> void:
 	stream.loop_end = num_samples - int(SAMPLE_RATE * 2.0)
 
 	_texture_player.stream = stream
-	_texture_player.volume_db = linear_to_db(music_volume * 0.35)
+	_texture_player.volume_db = _safe_linear_to_db(music_volume * 0.35)
 	_texture_player.play()
 
 # --- HELPERS ---
+
+## Prevent set_volume_db receiving -INF or NaN when volume is zero.
+func _safe_linear_to_db(linear: float) -> float:
+	return linear_to_db(maxf(linear, 0.0001))
 
 func _stop_all() -> void:
 	for p: AudioStreamPlayer in [_pad_player, _bass_player, _arp_player, _perc_player, _texture_player]:
@@ -397,15 +404,15 @@ func _stop_all() -> void:
 
 func _apply_volume() -> void:
 	if _pad_player:
-		_pad_player.volume_db = linear_to_db(music_volume * 0.75)
+		_pad_player.volume_db = _safe_linear_to_db(music_volume * 0.75)
 	if _arp_player:
-		_arp_player.volume_db = linear_to_db(music_volume * 0.5)
+		_arp_player.volume_db = _safe_linear_to_db(music_volume * 0.5)
 	if _bass_player:
-		_bass_player.volume_db = linear_to_db(music_volume * 0.55)
+		_bass_player.volume_db = _safe_linear_to_db(music_volume * 0.55)
 	if _perc_player:
-		_perc_player.volume_db = linear_to_db(music_volume * 0.3)
+		_perc_player.volume_db = _safe_linear_to_db(music_volume * 0.3)
 	if _texture_player:
-		_texture_player.volume_db = linear_to_db(music_volume * 0.35)
+		_texture_player.volume_db = _safe_linear_to_db(music_volume * 0.35)
 
 func _detect_chapter() -> int:
 	var lvl: int = Global.current_level

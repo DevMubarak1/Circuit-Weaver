@@ -6,6 +6,11 @@ signal gate_clicked(gate_type: String)
 
 @export var gate_type: String = "AND"
 
+# Scroll-safe touch tracking
+var _touch_start_pos: Vector2 = Vector2.ZERO
+var _touch_moved: bool = false
+const _SCROLL_THRESHOLD: float = 10.0
+
 # --- TRUTH TABLE DATA ---
 
 const TRUTH_TABLES: Dictionary = {
@@ -133,14 +138,24 @@ func _gui_input(event: InputEvent) -> void:
 		var sfx = get_node_or_null("/root/SFXManager")
 		if sfx:
 			sfx.play_button_press()
-	elif event is InputEventScreenTouch and event.pressed:
-		# Touch tap — also emit gate_clicked for tap-to-place on mobile
-		self_modulate = ThemeManager.SIGNAL_ACTIVE
-		modulate = Color(1.5, 1.5, 1.5)
-		gate_clicked.emit(gate_type)
-		var sfx = get_node_or_null("/root/SFXManager")
-		if sfx:
-			sfx.play_button_press()
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			# Record where the finger landed — don't fire yet (could be start of a scroll)
+			_touch_start_pos = event.position
+			_touch_moved = false
+		else:
+			# Finger lifted — only treat as a tap if it barely moved
+			if not _touch_moved:
+				self_modulate = ThemeManager.SIGNAL_ACTIVE
+				modulate = Color(1.5, 1.5, 1.5)
+				gate_clicked.emit(gate_type)
+				var sfx = get_node_or_null("/root/SFXManager")
+				if sfx:
+					sfx.play_button_press()
+	elif event is InputEventScreenDrag:
+		# Finger is dragging — mark as scroll if it moved past threshold
+		if _touch_start_pos != Vector2.ZERO and event.position.distance_to(_touch_start_pos) > _SCROLL_THRESHOLD:
+			_touch_moved = true
 
 func clear_highlight() -> void:
 	modulate = Color.WHITE

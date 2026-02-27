@@ -70,7 +70,7 @@ func can_redo() -> bool:
 	return not _redo_stack.is_empty()
 
 func undo() -> void:
-	if _undo_stack.is_empty() or not _circuit_board:
+	if _undo_stack.is_empty() or not is_instance_valid(_circuit_board):
 		return
 	var action: Dictionary = _undo_stack.pop_back()
 	_redo_stack.append(action)
@@ -86,7 +86,7 @@ func undo() -> void:
 			_undo_delete_wire(action["data"])
 
 func redo() -> void:
-	if _redo_stack.is_empty() or not _circuit_board:
+	if _redo_stack.is_empty() or not is_instance_valid(_circuit_board):
 		return
 	var action: Dictionary = _redo_stack.pop_back()
 	_undo_stack.append(action)
@@ -109,20 +109,25 @@ func clear() -> void:
 
 func _undo_place_gate(data: Dictionary) -> void:
 	var gate_id: String = data["gate_id"]
-	if _circuit_board.gates.has(gate_id):
+	if is_instance_valid(_circuit_board) and _circuit_board.gates.has(gate_id):
 		var gate: LogicGate = _circuit_board.gates[gate_id]
-		# Remove connected wires
-		var wires_to_remove: Array[Wire] = []
-		for wire in _circuit_board.wires:
-			if wire.from_gate == gate or wire.to_gate == gate:
-				wires_to_remove.append(wire)
-		for wire in wires_to_remove:
-			wire.queue_free()
-			_circuit_board.wires.erase(wire)
-		_circuit_board.gates.erase(gate_id)
-		gate.queue_free()
+		if is_instance_valid(gate):
+			# Remove connected wires
+			var wires_to_remove: Array[Wire] = []
+			for wire in _circuit_board.wires:
+				if not is_instance_valid(wire):
+					continue
+				if wire.from_gate == gate or wire.to_gate == gate:
+					wires_to_remove.append(wire)
+			for wire in wires_to_remove:
+				wire.queue_free()
+				_circuit_board.wires.erase(wire)
+			_circuit_board.gates.erase(gate_id)
+			gate.queue_free()
 
 func _undo_delete_gate(data: Dictionary) -> void:
+	if not is_instance_valid(_circuit_board):
+		return
 	var gate_type: String = data["gate_type"]
 	var pos: Vector2 = data["position"]
 	var grid_pos = Vector2i(int(pos.x / _circuit_board.GRID_SIZE), int(pos.y / _circuit_board.GRID_SIZE))

@@ -6,6 +6,10 @@ extends Node
 var _master_volume: float = 0.8
 var _sfx_volume: float = 1.0
 
+## Prevent set_volume_db receiving -INF or NaN when volume is zero.
+func _safe_linear_to_db(linear: float) -> float:
+	return linear_to_db(maxf(linear, 0.0001))
+
 # Cached AudioStreamPlayers
 var _snap_player: AudioStreamPlayer
 var _click_player: AudioStreamPlayer
@@ -62,7 +66,7 @@ func play_button_press() -> void:
 
 func set_master_volume(vol: float) -> void:
 	_master_volume = clamp(vol, 0.0, 1.0)
-	AudioServer.set_bus_volume_db(0, linear_to_db(_master_volume))
+	AudioServer.set_bus_volume_db(0, _safe_linear_to_db(_master_volume))
 
 func get_master_volume() -> float:
 	return _master_volume
@@ -118,7 +122,7 @@ func load_audio_settings() -> void:
 		_master_volume = config.get_value("Settings", "master_volume", 0.8)
 		_sfx_volume = config.get_value("Settings", "sfx_volume", 1.0)
 		screen_shake_enabled = config.get_value("Settings", "screen_shake", true)
-		AudioServer.set_bus_volume_db(0, linear_to_db(_master_volume))
+		AudioServer.set_bus_volume_db(0, _safe_linear_to_db(_master_volume))
 
 # --- INTERNAL ---
 
@@ -164,7 +168,7 @@ func _play_tone(player: AudioStreamPlayer, freq: float, duration: float, volume:
 
 	audio.data = data
 	player.stream = audio
-	player.volume_db = linear_to_db(_master_volume)
+	player.volume_db = _safe_linear_to_db(_master_volume)
 	player.play()
 
 func _play_arpeggio(player: AudioStreamPlayer, stars: int) -> void:
@@ -211,5 +215,5 @@ func _play_arpeggio(player: AudioStreamPlayer, stars: int) -> void:
 
 	audio.data = data
 	player.stream = audio
-	player.volume_db = linear_to_db(_master_volume)
+	player.volume_db = _safe_linear_to_db(_master_volume)
 	player.play()

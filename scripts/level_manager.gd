@@ -176,8 +176,8 @@ func load_architect_profile() -> void:
 func apply_level_theme() -> void:
 	var resp = get_node_or_null("/root/ResponsiveManager")
 	var ui_scale: float = resp.ui_scale if resp else 1.0
-	var chapter: int = level_data.get("chapter", 1)
-	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var _chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(_chapter)
 
 	var sidebar = get_node_or_null("CanvasLayer/MainUI/HBoxContainer/Sidebar") as PanelContainer
 	if sidebar:
@@ -403,8 +403,12 @@ func _on_output_signal_received(_value: int, output_node: OutputNode) -> void:
 	var anim_ok = get_node_or_null("/root/AnimHelper")
 	if anim_ok:
 		anim_ok.pulse_glow(output_node, ThemeManager.GATE_OR_GREEN, 2)
+	if not circuit_board:
+		return
 	var all_complete: bool = true
 	for out in circuit_board.output_nodes:
+		if not is_instance_valid(out):
+			continue
 		if out.received_sequence.size() < out.target_sequence.size():
 			all_complete = false
 			break
@@ -419,8 +423,10 @@ func _on_output_signal_received(_value: int, output_node: OutputNode) -> void:
 func run_simulation() -> void:
 	if not level_started or level_complete:
 		return
+	if not is_instance_valid(circuit_board):
+		return
 	var sfx = get_node_or_null("/root/SFXManager")
-	if circuit_board and circuit_board.wires.is_empty():
+	if circuit_board.wires.is_empty():
 		# No wires connected — nothing to simulate
 		if sfx:
 			sfx.play_error_buzz()
@@ -431,12 +437,16 @@ func run_simulation() -> void:
 	if sfx:
 		sfx.play_simulation_hum(1.5)
 	await get_tree().create_timer(1.0).timeout
+	if not is_inside_tree():
+		return
 	if sfx:
 		sfx.stop_simulation_hum()
 	# Check for failure after simulation completes
-	if not level_complete and _tutorial_complete:
+	if not level_complete and _tutorial_complete and is_instance_valid(circuit_board):
 		var any_output_tested: bool = false
 		for out in circuit_board.output_nodes:
+			if not is_instance_valid(out):
+				continue
 			if out.received_sequence.size() > 0:
 				any_output_tested = true
 				break
@@ -453,10 +463,12 @@ func run_simulation() -> void:
 func evaluate_level_performance() -> void:
 	if level_complete:
 		return
+	if not is_instance_valid(circuit_board):
+		return
 	level_complete = true
 	var max_gates: int = level_data.get("max_gates", 1)
 	# Use live gate count for scoring — not cumulative placements
-	var actual_gates: int = circuit_board.gates.size() if circuit_board else gates_placed
+	var actual_gates: int = circuit_board.gates.size()
 	var score = 1
 	
 	if actual_gates <= max_gates:
@@ -511,7 +523,7 @@ func _do_scene_transition(scene_path: String, is_chapter_change: bool) -> void:
 	if tm and tm.has_method("transition_to_scene"):
 		tm.transition_to_scene(scene_path, is_chapter_change)
 	else:
-		get_tree().change_scene_to_file(scene_path)
+		get_tree().call_deferred("change_scene_to_file", scene_path)
 
 func show_graduation_screen() -> void:
 	if not level_complete_panel:
@@ -553,9 +565,11 @@ func show_graduation_screen() -> void:
 var _result_stars: int = 0
 
 func show_level_complete_panel(stars: int) -> void:
-	_result_stars = stars
 	if not level_complete_panel:
 		create_level_complete_panel()
+	if not is_instance_valid(level_complete_label) or not is_instance_valid(level_complete_panel):
+		return
+	_result_stars = stars
 	
 	var star_display := ""
 	for i in range(3):
@@ -582,8 +596,8 @@ func show_level_complete_panel(stars: int) -> void:
 	result_text += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 	result_text += "%s\n\n" % star_display
 	result_text += "%s\n\n" % grade_text
-	var actual_gates_result: int = circuit_board.gates.size() if circuit_board else gates_placed
-	var actual_wires_result: int = circuit_board.wires.size() if circuit_board else wires_connected
+	var actual_gates_result: int = circuit_board.gates.size() if is_instance_valid(circuit_board) else gates_placed
+	var actual_wires_result: int = circuit_board.wires.size() if is_instance_valid(circuit_board) else wires_connected
 	result_text += "Formula: %s\n" % formula
 	result_text += "Gates Used: %d / %d\n" % [actual_gates_result, max_gates]
 	result_text += "Wires Used: %d" % actual_wires_result
@@ -637,8 +651,8 @@ func show_level_complete_panel(stars: int) -> void:
 		tween.tween_property(level_complete_panel, "modulate:a", 1.0, 0.4)
 
 func create_level_complete_panel() -> void:
-	var chapter: int = level_data.get("chapter", 1)
-	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var _chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(_chapter)
 
 	level_complete_panel = PanelContainer.new()
 	level_complete_panel.name = "LevelCompletePanel"
@@ -735,43 +749,100 @@ func _on_share_button_pressed() -> void:
 	var share_gates: int = circuit_board.gates.size() if circuit_board else gates_placed
 	var share_wires: int = circuit_board.wires.size() if circuit_board else wires_connected
 	const SHARE_URL := "https://circuitweaver.devmubarak.me"
-	var caption := "Circuit Weaver — Level %d: %s\n%s | Gates: %d | Wires: %d\n\nI'm learning logic gates! Download and try: %s" % [
+	var caption := "⚡ Circuit Weaver — Level %d: %s\n%s | Gates: %d | Wires: %d\n\nI'm learning logic gates! Can you solve it too?\nDownload & try: %s" % [
 		current_level_id, title, star_display, share_gates, share_wires, SHARE_URL
 	]
-	# Capture current screen (level complete panel visible) as image
+
+	var share_btn = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/ShareBtn") if level_complete_panel else null
+	if share_btn:
+		share_btn.text = "GENERATING..."
+
+	# Wait for the frame to be fully rendered (level complete panel visible)
 	await RenderingServer.frame_post_draw
-	var view_texture: ViewportTexture = get_viewport().get_texture()
-	var img: Image = view_texture.get_image()
-	# Save under user:// so share plugin can use path relative to user://
-	const SHARE_FILENAME := "circuit_weaver_share.png"
-	var save_path: String = "user://" + SHARE_FILENAME
-	var err: Error = img.save_png(save_path)
-	var share_btn = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/ShareBtn")
-	if err != OK:
-		DisplayServer.clipboard_set(caption)
-		if share_btn:
-			share_btn.text = "COPIED TO CLIPBOARD!"
-		await get_tree().create_timer(2.0).timeout
-		if share_btn:
-			share_btn.text = "SHARE RESULT"
+
+	# Capture the current screen as the share image
+	var view_texture = get_viewport().get_texture()
+	if not view_texture:
+		_share_fallback_clipboard(caption, share_btn)
 		return
-	# Open native share sheet when GodotShare plugin is available (Android)
+	var img: Image = view_texture.get_image()
+	if not img:
+		_share_fallback_clipboard(caption, share_btn)
+		return
+
+	# Save using OS.get_user_data_dir() — required path format for GodotShare plugin
+	const SHARE_FILENAME := "circuit_weaver_share.png"
+	var user_data_dir: String = OS.get_user_data_dir()
+	var absolute_path: String = user_data_dir + "/" + SHARE_FILENAME
+	var err: Error = img.save_png(absolute_path)
+	if err != OK:
+		# Fallback: try user:// virtual path
+		var save_path: String = "user://" + SHARE_FILENAME
+		err = img.save_png(save_path)
+		if err != OK:
+			_share_fallback_clipboard(caption, share_btn)
+			return
+		absolute_path = ProjectSettings.globalize_path(save_path)
+
+	print("SHARE: Image saved to: ", absolute_path)
+
+	# Try native Android share via Java bridge
 	var share_opened: bool = false
-	if Engine.has_singleton("GodotShare"):
-		var godot_share = Engine.get_singleton("GodotShare")
-		# GodotShare: share_img(path_relative_to_user, title, message)
-		if godot_share.has_method("share_img"):
-			godot_share.share_img(SHARE_FILENAME, "Circuit Weaver", caption)
-			share_opened = true
-		elif godot_share.has_method("sharePic"):
-			godot_share.sharePic(ProjectSettings.globalize_path(save_path), "Circuit Weaver", "My level result", caption)
-			share_opened = true
+	if OS.get_name() == "Android":
+		share_opened = _android_share_image(absolute_path, caption)
+
 	if not share_opened:
-		DisplayServer.clipboard_set(caption)
+		_share_fallback_clipboard(caption, share_btn)
+		return
+
 	if share_btn:
-		share_btn.text = "SHARED!" if share_opened else "IMAGE SAVED · CAPTION COPIED!"
+		share_btn.text = "SHARED!"
 	await get_tree().create_timer(2.0).timeout
+	if is_instance_valid(share_btn):
+		share_btn.text = "SHARE RESULT"
+
+func _android_share_image(_image_path: String, caption: String) -> bool:
+	"""Open Android's native share sheet via the GodotShare plugin.
+	   Actual method names discovered by inspecting the AAR bytecode:
+	   share_img(path, title, message)  -- primary
+	   share_img_web(path, title, message) -- fallback
+	"""
+	if not Engine.has_singleton("GodotShare"):
+		print("SHARE: GodotShare plugin not found!")
+		return false
+
+	var share = Engine.get_singleton("GodotShare")
+	print("SHARE: Found GodotShare singleton (class: %s)." % share.get_class())
+
+	var title = "Circuit Weaver — Level %d" % current_level_id
+
+	# ── Primary: use the exact method names baked into the installed AAR ────
+	# (Discovered by scanning com/godot/godotshare/GodotShare.class bytecode)
+	if share.has_method("share_img"):
+		print("SHARE: Calling share_img().")
+		share.share_img(_image_path, title, caption)
+		return true
+
+	if share.has_method("share_img_web"):
+		print("SHARE: Calling share_img_web().")
+		share.share_img_web(_image_path, title, caption)
+		return true
+
+	# ── Blind fallback: has_method() fails for JNISingleton ─────────────────
+	# The @UsedByGodot method IS found at JNI level even when has_method()
+	# returns false (Godot 4 engine version mismatch with plugin compile target).
+	# callv() routes directly through the JNI bridge and works correctly.
+	print("SHARE: Calling share_img('%s', '%s', caption)." % [_image_path, title])
+	share.callv("share_img", [_image_path, title, caption])
+	return true
+
+func _share_fallback_clipboard(caption: String, share_btn: Button) -> void:
+	DisplayServer.clipboard_set(caption)
 	if share_btn:
+		share_btn.text = "COPIED TO CLIPBOARD!"
+	# Wait then reset button text
+	await get_tree().create_timer(2.0).timeout
+	if is_instance_valid(share_btn):
 		share_btn.text = "SHARE RESULT"
 
 func _on_next_level_button_pressed() -> void:
@@ -820,7 +891,7 @@ func _show_level_failed() -> void:
 		tween.tween_property(_level_failed_panel, "modulate:a", 1.0, 0.4)
 
 func _create_level_failed_panel() -> void:
-	var chapter: int = level_data.get("chapter", 1)
+	var _chapter: int = level_data.get("chapter", 1)
 	var fail_color: Color = ThemeManager.ACCENT_WARNING
 
 	_level_failed_panel = PanelContainer.new()
@@ -979,7 +1050,7 @@ func advance_tutorial() -> void:
 				# Fade out the tutorial panel for the COMPLETE step
 				if tutorial_panel:
 					var tw = tutorial_panel.create_tween()
-					tw.tween_interval(2.5)  # Show for 2.5 seconds
+					tw.tween_interval(1)  # Show for 1 seconds
 					tw.tween_property(tutorial_panel, "modulate:a", 0.0, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 					tw.tween_callback(func() -> void:
 						if tutorial_panel:
@@ -1179,16 +1250,18 @@ func _move_panel_bottom() -> void:
 	_panel_position = "bottom"
 
 func _process(_delta: float) -> void:
+	if not is_inside_tree():
+		return
 	# Move tutorial panel out of the way when user drags near it
 	if not tutorial_panel or not tutorial_panel.is_inside_tree() or _tutorial_complete:
 		return
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
-	
+
 	var mouse = get_viewport().get_mouse_position()
 	var panel_rect = Rect2(tutorial_panel.global_position, tutorial_panel.size)
 	var expanded = panel_rect.grow(40.0)
-	
+
 	if expanded.has_point(mouse):
 		var viewport_h = get_viewport().get_visible_rect().size.y
 		if mouse.y < viewport_h / 2.0:
@@ -1311,7 +1384,7 @@ func _on_exit_button_pressed() -> void:
 	var music_mgr = get_node_or_null("/root/MusicManager")
 	if music_mgr:
 		music_mgr.stop_music()
-	get_tree().change_scene_to_file("res://scenes/level_select.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/level_select.tscn")
 
 func _on_reset_button_pressed() -> void:
 	var sfx = get_node_or_null("/root/SFXManager")
@@ -1563,8 +1636,8 @@ func _create_settings_panel() -> void:
 	_settings_panel.anchor_bottom = 0.85
 	_settings_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var chapter: int = level_data.get("chapter", 1)
-	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var _chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(_chapter)
 	var bg_style = ThemeManager.create_glass_panel(ch_accent, 12, 2)
 	bg_style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
 	bg_style.shadow_size = 12
@@ -1742,8 +1815,8 @@ func _on_shortcuts_button_pressed() -> void:
 		anim.pop_in(_shortcuts_panel, 0.3)
 
 func _create_shortcuts_panel() -> void:
-	var chapter: int = level_data.get("chapter", 1)
-	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var _chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(_chapter)
 
 	_shortcuts_panel = PanelContainer.new()
 	_shortcuts_panel.name = "ShortcutsPanel"
@@ -1858,8 +1931,8 @@ func _on_truth_table_button_pressed() -> void:
 		anim.pop_in(_truth_table_panel, 0.3)
 
 func _create_truth_table_panel() -> void:
-	var chapter: int = level_data.get("chapter", 1)
-	var ch_accent: Color = ThemeManager.get_chapter_accent(chapter)
+	var _chapter: int = level_data.get("chapter", 1)
+	var ch_accent: Color = ThemeManager.get_chapter_accent(_chapter)
 	var allowed: Array = level_data.get("allowed_gates", [])
 
 	_truth_table_panel = PanelContainer.new()
@@ -1979,14 +2052,43 @@ func _on_hint_button_pressed() -> void:
 	if sfx:
 		sfx.play_button_press()
 
-	# First hint is free; subsequent hints require a rewarded ad
-	if _hints_revealed >= 1 and _hints_revealed < hints_arr.size():
+	# All free hints (first 2) have been used
+	if _hints_revealed >= 2:
 		var ad_mgr = get_node_or_null("/root/AdManager")
-		if ad_mgr and ad_mgr.is_rewarded_ready():
-			ad_mgr.show_rewarded(_reveal_next_hint)
-			return  # Wait for reward callback
-	# Free hint or no ad available — reveal directly
+		if _hints_revealed < hints_arr.size():
+			# More hints exist — require a rewarded ad to unlock the next one
+			if ad_mgr and ad_mgr.is_rewarded_ready():
+				ad_mgr.show_rewarded(_reveal_next_hint)
+				return  # Wait for reward callback
+			else:
+				# Ad not ready — show panel with a "watch ad" nudge
+				_refresh_hint_panel_visible()
+				return
+		else:
+			# All hints already revealed — offer a rewarded ad to replay them
+			if ad_mgr and ad_mgr.is_rewarded_ready():
+				ad_mgr.show_rewarded(func() -> void:
+					_refresh_hint_panel_visible()
+				)
+				return
+			else:
+				# No ad ready — just reopen the panel silently
+				_refresh_hint_panel_visible()
+				return
+
+	# Free hint (hints_revealed < 2) — reveal directly
 	_reveal_next_hint()
+
+func _refresh_hint_panel_visible() -> void:
+	"""Rebuild and show the hint panel without incrementing the hint counter."""
+	if _hint_panel:
+		_hint_panel.queue_free()
+		_hint_panel = null
+	_create_hint_panel()
+	_hint_panel.visible = true
+	var anim_r = get_node_or_null("/root/AnimHelper")
+	if anim_r:
+		anim_r.pop_in(_hint_panel, 0.3)
 
 func _reveal_next_hint() -> void:
 	var hints_arr: Array = level_data.get("hints", [])
@@ -2061,11 +2163,24 @@ func _create_hint_panel() -> void:
 
 	if _hints_revealed < hints_arr.size():
 		var more_lbl = Label.new()
-		more_lbl.text = "Click HINT again for next hint..."
-		more_lbl.add_theme_color_override("font_color", ThemeManager.TEXT_MUTED)
+		if _hints_revealed >= 2:
+			more_lbl.text = "▶ Watch a short ad to unlock the next hint"
+			more_lbl.add_theme_color_override("font_color", Color(0.85, 0.65, 0.1))
+		else:
+			more_lbl.text = "Tap HINT again for the next free hint..."
+			more_lbl.add_theme_color_override("font_color", ThemeManager.TEXT_MUTED)
 		more_lbl.add_theme_font_size_override("font_size", 11)
 		more_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		more_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		more_lbl.custom_minimum_size = Vector2(300, 0)
 		vbox.add_child(more_lbl)
+	elif _hints_revealed >= hints_arr.size():
+		var done_lbl = Label.new()
+		done_lbl.text = "✓ All hints revealed"
+		done_lbl.add_theme_color_override("font_color", ThemeManager.TEXT_MUTED)
+		done_lbl.add_theme_font_size_override("font_size", 11)
+		done_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(done_lbl)
 
 	var close_btn = Button.new()
 	close_btn.text = "GOT IT"

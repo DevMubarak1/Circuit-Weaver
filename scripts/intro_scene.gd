@@ -220,4 +220,4 @@ func _navigate_next() -> void:
 	if tm and tm.has_method("transition_to_scene"):
 		tm.transition_to_scene(target, false)
 	else:
-		get_tree().change_scene_to_file(target)
+		get_tree().call_deferred("change_scene_to_file", target)

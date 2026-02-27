@@ -638,7 +638,7 @@ func _launch_level(level_id: int) -> void:
 	if tm and tm.has_method("transition_to_scene"):
 		tm.transition_to_scene(scene_path, false)
 	else:
-		get_tree().change_scene_to_file(scene_path)
+		get_tree().call_deferred("change_scene_to_file", scene_path)
 
 # ===================================================================
 # HELPERS
@@ -662,4 +662,4 @@ func _on_logout_pressed() -> void:
 	if tm and tm.has_method("transition_to_scene"):
 		tm.transition_to_scene("res://scenes/user_profile.tscn", false)
 	else:
-		get_tree().change_scene_to_file("res://scenes/user_profile.tscn")
+		get_tree().call_deferred("change_scene_to_file", "res://scenes/user_profile.tscn")

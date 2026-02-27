@@ -44,9 +44,12 @@ func _ready() -> void:
 
 	if from_port and to_port:
 		update_line()
-	set_process(true)
+	if is_inside_tree():
+		set_process(true)
 
 func _process(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	# Only rebuild line when port positions actually change (gate dragged)
 	if from_port and to_port:
 		var s: Vector2 = from_port.global_position
@@ -67,6 +70,8 @@ func update_line() -> void:
 func _rebuild_line() -> void:
 	if not line:
 		line = get_node_or_null("Line2D")
+	if not glow_line:
+		glow_line = get_node_or_null("GlowLine")
 
 	if line and from_port and to_port:
 		line.clear_points()
@@ -142,7 +147,8 @@ func transmit_signal(value: int) -> void:
 	is_flowing = true
 	is_animating = true
 	animation_progress = 0.0
-	set_process(true)
+	if is_inside_tree():
+		set_process(true)
 	signal_transmitted.emit(value)
 
 func receive_at_destination() -> void:
@@ -164,6 +170,8 @@ func update_animation(delta: float) -> void:
 			animation_progress = 1.0
 			# NOTE: Do NOT call set_process(false) here — update_line() must
 			# keep running so wires redraw when gates are dragged.
+	elif not is_flowing:
+		set_process(false)
 
 func get_signal_value() -> int:
 	return current_signal
@@ -173,4 +181,4 @@ func stop_flowing() -> void:
 	is_flowing = false
 	animation_progress = 0.0
 	_set_shader_active(false, ThemeManager.SIGNAL_INACTIVE)
-	# Keep set_process(true) so update_line() continues for dragging
+	set_process(false)

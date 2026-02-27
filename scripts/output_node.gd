@@ -26,6 +26,8 @@ func _ready() -> void:
 
 	if label:
 		label.text = output_name
+	if target_sequence.is_empty():
+		target_sequence = PackedInt32Array([1])
 	update_indicator()
 
 func _create_analyzer_display() -> void:

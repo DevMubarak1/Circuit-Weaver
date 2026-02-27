@@ -20,10 +20,14 @@ func _ready() -> void:
 	
 	if label:
 		label.text = input_name
+	if signal_sequence.is_empty():
+		signal_sequence = PackedInt32Array([1])
 	output_value = signal_sequence[0]
 	set_process_input(true)
 
 func get_current_value() -> int:
+	if signal_sequence.is_empty():
+		return 0
 	return signal_sequence[current_index % signal_sequence.size()]
 
 func advance_sequence() -> void:
@@ -37,7 +41,8 @@ func advance_sequence() -> void:
 func propagate_to_wires() -> void:
 	var value = get_current_value()
 	for wire in connected_wires:
-		wire.transmit_signal(value)
+		if is_instance_valid(wire):
+			wire.transmit_signal(value)
 
 func add_connected_wire(wire: Wire) -> void:
 	if wire not in connected_wires:

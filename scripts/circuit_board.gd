@@ -385,10 +385,12 @@ func _handle_gate_click(mouse_pos: Vector2) -> bool:
 
 
 func _process(_delta: float) -> void:
+	if not is_inside_tree():
+		return
 	# Handle gate dragging (mouse or touch)
 	if dragging_gate and (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _touch_active):
 		dragging_gate.position = get_local_mouse_position() - drag_offset
-	
+    
 	# Redraw for wiring preview only when actively wiring
 	if wiring_mode and selected_port:
 		queue_redraw()
@@ -853,46 +855,128 @@ func start_simulation() -> void:
 			seq_length = input_node.signal_sequence.size()
 
 	for step in range(seq_length):
+		if not is_inside_tree():
+			return
 		if step > 0:
 			# Advance all inputs and reset gate intermediate state
 			for input_node in input_nodes:
+				if not is_instance_valid(input_node):
+					continue
 				input_node.advance_sequence()
 			for gate in gates.values():
-				gate.clear_inputs()
+				if is_instance_valid(gate):
+					gate.clear_inputs()
 			# Small pause between steps for visual feedback
 			await get_tree().create_timer(0.15).timeout
+			if not is_inside_tree():
+				return
 
-
+		# --- PHASE 1: Feed all input values into first-layer gates (no propagation yet) ---
 		for input_node in input_nodes:
+			if not is_instance_valid(input_node):
+				continue
 			var current_value: int = input_node.get_current_value()
-			await propagate_signal_from_input(input_node, current_value)
-
+			_feed_input_to_wires(input_node, current_value)
+		
+		# Allow UI to update
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+		
+		# --- PHASE 2: Evaluate all gates and propagate through circuit ---
+		_evaluate_all_gates_topological()
+		
 		# Wait for all gates to settle this step
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 
 	# Simulation finished — reset flag so it can run again
 	end_simulation()
 
-
-func propagate_signal_from_input(input_node: InputNode, value: int) -> void:
+func _feed_input_to_wires(input_node: InputNode, value: int) -> void:
+	"""Set wire values and feed into gate input slots WITHOUT triggering gate evaluation."""
 	for wire in input_node.connected_wires:
+		if not is_instance_valid(wire):
+			continue
 		wire.transmit_signal(value)
-		await get_tree().process_frame
-		await get_tree().process_frame
-		wire.receive_at_destination()
-		
-		await get_tree().process_frame
-		await get_tree().process_frame
+		# Directly set the destination gate's input slot without calling evaluate()
+		if is_instance_valid(wire) and wire.to_port:
+			var dest_gate = wire.to_port.get_meta("gate_owner") if wire.to_port.has_meta("gate_owner") else null
+			if dest_gate:
+				if dest_gate is OutputNode:
+					# Don't feed output nodes yet — they get results from gates
+					pass
+				elif dest_gate is LogicGate:
+					var port_idx: int = wire.to_port.get_meta("port_index") if wire.to_port.has_meta("port_index") else 0
+					dest_gate.input_slots[port_idx] = value
+
+func _evaluate_all_gates_topological() -> void:
+	"""Evaluate all gates and propagate through the circuit layer by layer."""
+	var evaluated: Dictionary = {}
+	var to_evaluate: Array = []
+	
+	# Handle direct input→output wires (no gate) AND find first-layer gates
+	for input_node in input_nodes:
+		var current_value: int = input_node.get_current_value()
+		for wire in input_node.connected_wires:
+			if not is_instance_valid(wire) or not wire.to_port:
+				continue
+			var dest = wire.to_port.get_meta("gate_owner") if wire.to_port.has_meta("gate_owner") else null
+			if dest is OutputNode:
+				# Direct input→output connection
+				dest.receive_input(current_value)
+			elif dest is LogicGate and not evaluated.has(dest.get_gate_id()):
+				to_evaluate.append(dest)
+				evaluated[dest.get_gate_id()] = true
+	
+	# Evaluate layer by layer (BFS through wires)
+	while not to_evaluate.is_empty():
+		var next_layer: Array = []
+		for gate in to_evaluate:
+			if not is_instance_valid(gate):
+				continue
+			var new_output = gate.compute_output()
+			gate.output_value = new_output
+			gate.output_changed.emit(new_output)
+			gate.gate_activated.emit()
+			# Propagate to connected gates/outputs
+			for wire in gate.connected_output_wires:
+				if not is_instance_valid(wire):
+					continue
+				wire.transmit_signal(new_output)
+				if wire.to_port:
+					var dest = wire.to_port.get_meta("gate_owner") if wire.to_port.has_meta("gate_owner") else null
+					if dest is OutputNode:
+						dest.receive_input(new_output)
+					elif dest is LogicGate:
+						var port_idx: int = wire.to_port.get_meta("port_index") if wire.to_port.has_meta("port_index") else 0
+						dest.input_slots[port_idx] = new_output
+						if not evaluated.has(dest.get_gate_id()):
+							next_layer.append(dest)
+							evaluated[dest.get_gate_id()] = true
+		to_evaluate = next_layer
 
 func reset_all_gates() -> void:
 	for gate in gates.values():
-		gate.clear_inputs()
+		if is_instance_valid(gate):
+			gate.clear_inputs()
 	
 	for output in output_nodes:
-		output.reset()
+		if is_instance_valid(output):
+			output.reset()
 
 func end_simulation() -> void:
 	is_simulating = false
@@ -921,11 +1005,15 @@ func _on_context_menu_selected(id: int) -> void:
 			drag_offset = get_local_mouse_position() - current_selected_gate.position
 
 func delete_gate(gate: LogicGate) -> void:
+	if not is_instance_valid(gate):
+		return
 	var gate_id = gate.get_gate_id()
 	
 	# Remove all wires connected to this gate
 	var wires_to_remove = []
 	for wire in wires:
+		if not is_instance_valid(wire):
+			continue
 		if wire.from_gate == gate or wire.to_gate == gate:
 			wires_to_remove.append(wire)
 	
@@ -939,6 +1027,8 @@ func delete_gate(gate: LogicGate) -> void:
 	gate.queue_free()
 
 func duplicate_gate(gate: LogicGate) -> void:
+	if not is_instance_valid(gate):
+		return
 	var new_gate = create_gate_instance(gate.gate_type, gate.position_in_grid)
 	if new_gate:
 		var container = get_node_or_null("GatesContainer")
@@ -1074,10 +1164,12 @@ func _point_to_segment(point: Vector2, seg_a: Vector2, seg_b: Vector2) -> float:
 	return point.distance_to(closest)
 
 func _delete_wire(wire: Wire) -> void:
-	if wire.from_port and wire.from_port.has_meta("connected_wire"):
+	if not is_instance_valid(wire):
+		return
+	if wire.from_port and is_instance_valid(wire.from_port) and wire.from_port.has_meta("connected_wire"):
 		if wire.from_port.get_meta("connected_wire") == wire:
 			wire.from_port.remove_meta("connected_wire")
-	if wire.to_port and wire.to_port.has_meta("connected_wire"):
+	if wire.to_port and is_instance_valid(wire.to_port) and wire.to_port.has_meta("connected_wire"):
 		if wire.to_port.get_meta("connected_wire") == wire:
 			wire.to_port.remove_meta("connected_wire")
 	wires.erase(wire)

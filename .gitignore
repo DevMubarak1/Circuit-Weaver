@@ -14,9 +14,18 @@
 *.stex
 *.ctex
 
-# ===== Android =====
-# Godot Android build output and generated files
+# ===== Android / iOS / Builds =====
+# Build output, generated files, and platform templates
 android/
+ios/
+jni/
+META-INF/
+res/
+AndroidManifest.xml
+build/
+bin/
+obj/
+addons/
 
 # ===== Godot Exports =====
 # Build outputs and export templates
@@ -25,7 +34,9 @@ android/
 *.x86_32
 *.apk
 *.aab
+*.ipa
 *.zip
+*.aar
 
 # Export presets (may contain signing keys / passwords)
 export_presets.cfg

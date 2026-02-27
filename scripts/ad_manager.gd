@@ -5,18 +5,33 @@
 #   https://github.com/poing-studios/godot-admob-android
 #
 # On non-Android platforms (desktop/web), ads are silently skipped.
-# All ad unit IDs are loaded from ad_config.gd (gitignored).
+# All ad unit IDs are loaded from ad_config.gd.
+#
+# Pattern follows the official Poing sample:
+#   Callbacks created ONCE as class members
+#   Load callbacks use named methods (not lambdas)
+#   FullScreenContentCallback set AFTER ad loads
 extends Node
 
 # --- STATE ---
 var _is_android: bool = false
-var _admob: Object = null  # MobileAds singleton from plugin
-var _interstitial_loaded: bool = false
-var _rewarded_loaded: bool = false
+var _initialized: bool = false
+var _interstitial_ad: InterstitialAd = null
+var _rewarded_ad: RewardedAd = null
 var _rewarded_callback: Callable = Callable()
 
-# Frequency cap: show interstitial every N levels (not every single one)
-const INTERSTITIAL_FREQUENCY: int = 3
+# Callback objects — strong references for the life of the game
+var _interstitial_load_cb: InterstitialAdLoadCallback
+var _interstitial_content_cb: FullScreenContentCallback
+var _rewarded_load_cb: RewardedAdLoadCallback
+var _rewarded_content_cb: FullScreenContentCallback
+
+# Loaders — strong references to prevent GC during async load
+var _interstitial_loader: InterstitialAdLoader
+var _rewarded_loader: RewardedAdLoader
+
+# Frequency cap: show interstitial every N levels
+const INTERSTITIAL_FREQUENCY: int = 1
 var _levels_since_last_ad: int = 0
 
 signal interstitial_closed
@@ -24,33 +39,50 @@ signal rewarded_earned
 signal rewarded_failed
 
 func _ready() -> void:
+	print("ADMOB: AdManager._ready() — instance: %d" % get_instance_id())
 	_is_android = OS.get_name() == "Android"
 	if not _is_android:
 		return
+		
+	_setup_callbacks()
+	
+	# Give the engine one frame to ensure all objects are registered
+	# before triggering the AdMob initialization sequence.
+	get_tree().process_frame.connect(_initialize_admob, CONNECT_ONE_SHOT)
 
-	# Check if AdMob plugin is available
-	if Engine.has_singleton("AdMob"):
-		_admob = Engine.get_singleton("AdMob")
-		_initialize_admob()
-	else:
-		push_warning("AdManager: AdMob plugin not found. Ads disabled.")
+func _setup_callbacks() -> void:
+	# Initialize all callbacks exactly ONCE to keep Callables permanently bound to 'self'
+	_interstitial_load_cb = InterstitialAdLoadCallback.new()
+	_interstitial_load_cb.on_ad_loaded = _on_interstitial_loaded
+	_interstitial_load_cb.on_ad_failed_to_load = _on_interstitial_failed_to_load
+
+	_interstitial_content_cb = FullScreenContentCallback.new()
+	_interstitial_content_cb.on_ad_dismissed_full_screen_content = _on_interstitial_dismissed
+	_interstitial_content_cb.on_ad_failed_to_show_full_screen_content = _on_interstitial_failed_to_show
+
+	_rewarded_load_cb = RewardedAdLoadCallback.new()
+	_rewarded_load_cb.on_ad_loaded = _on_rewarded_loaded
+	_rewarded_load_cb.on_ad_failed_to_load = _on_rewarded_failed_to_load
+
+	_rewarded_content_cb = FullScreenContentCallback.new()
+	_rewarded_content_cb.on_ad_dismissed_full_screen_content = _on_rewarded_dismissed
+	_rewarded_content_cb.on_ad_failed_to_show_full_screen_content = _on_rewarded_failed_to_show
+
+# ===================================================================
+# INITIALIZATION
+# ===================================================================
 
 func _initialize_admob() -> void:
-	if not _admob:
+	if _initialized:
 		return
+	var listener := OnInitializationCompleteListener.new()
+	listener.on_initialization_complete = _on_admob_initialized
+	MobileAds.initialize(listener)
+	print("ADMOB: Initializing...")
 
-	# Initialize with test mode based on config
-	var _is_test: bool = true
-	if ClassDB.class_exists("AdConfig"):
-		_is_test = AdConfig.USE_TEST_ADS
-
-	_admob.initialize()
-
-	# Connect signals
-	if _admob.has_signal("initialization_completed"):
-		_admob.initialization_completed.connect(_on_admob_initialized)
-
-func _on_admob_initialized() -> void:
+func _on_admob_initialized(_status: InitializationStatus) -> void:
+	_initialized = true
+	print("ADMOB: Initialized successfully")
 	load_interstitial()
 	load_rewarded()
 
@@ -59,24 +91,16 @@ func _on_admob_initialized() -> void:
 # ===================================================================
 
 func load_interstitial() -> void:
-	if not _admob:
+	if not _is_android or not _initialized:
 		return
 	var unit_id: String = _get_interstitial_id()
+	print("ADMOB: Loading interstitial with ID: '%s'" % unit_id)
 	if unit_id.is_empty():
 		return
 
-	if _admob.has_method("load_interstitial"):
-		_admob.load_interstitial(unit_id)
-
-	if _admob.has_signal("interstitial_loaded"):
-		if not _admob.interstitial_loaded.is_connected(_on_interstitial_loaded):
-			_admob.interstitial_loaded.connect(_on_interstitial_loaded)
-	if _admob.has_signal("interstitial_closed"):
-		if not _admob.interstitial_closed.is_connected(_on_interstitial_closed):
-			_admob.interstitial_closed.connect(_on_interstitial_closed)
-	if _admob.has_signal("interstitial_failed_to_load"):
-		if not _admob.interstitial_failed_to_load.is_connected(_on_interstitial_failed):
-			_admob.interstitial_failed_to_load.connect(_on_interstitial_failed)
+	_interstitial_loader = InterstitialAdLoader.new()
+	_interstitial_loader.load(unit_id, AdRequest.new(), _interstitial_load_cb)
+	print("ADMOB: Interstitial load request sent")
 
 func show_interstitial_if_ready() -> void:
 	"""Call this after level completion. Respects frequency cap."""
@@ -84,112 +108,132 @@ func show_interstitial_if_ready() -> void:
 	if _levels_since_last_ad < INTERSTITIAL_FREQUENCY:
 		interstitial_closed.emit()
 		return
-	if not _is_android or not _admob or not _interstitial_loaded:
+	if not _is_android or _interstitial_ad == null:
+		print("ADMOB: Ad was null, could not call show.")
 		interstitial_closed.emit()
 		return
-	_levels_since_last_ad = 0
-	if _admob.has_method("show_interstitial"):
-		_admob.show_interstitial()
+	
+	if is_instance_valid(_interstitial_ad):
+		_levels_since_last_ad = 0
+		_interstitial_ad.show()
+		print("ADMOB: Showing interstitial")
 	else:
+		print("ADMOB: Interstitial ad instance invalid.")
+		_interstitial_ad = null
 		interstitial_closed.emit()
 
-func _on_interstitial_loaded() -> void:
-	_interstitial_loaded = true
+# --- Interstitial callbacks ---
 
-func _on_interstitial_closed() -> void:
-	_interstitial_loaded = false
+func _on_interstitial_loaded(ad: InterstitialAd) -> void:
+	print("ADMOB: Interstitial loaded!")
+	ad.full_screen_content_callback = _interstitial_content_cb
+	_interstitial_ad = ad
+
+func _on_interstitial_failed_to_load(error: LoadAdError) -> void:
+	print("ADMOB: Interstitial failed to load: %s" % error.message)
+	_interstitial_ad = null
+
+func _on_interstitial_dismissed() -> void:
+	print("ADMOB: Interstitial dismissed")
+	if _interstitial_ad:
+		_interstitial_ad.destroy()
+	_interstitial_ad = null
 	interstitial_closed.emit()
-	# Pre-load next one
 	load_interstitial()
 
-func _on_interstitial_failed(_error_code: int = 0) -> void:
-	_interstitial_loaded = false
+func _on_interstitial_failed_to_show(_error: AdError) -> void:
+	print("ADMOB: Interstitial failed to show")
+	_interstitial_ad = null
+	interstitial_closed.emit()
+	load_interstitial()
 
 # ===================================================================
 # REWARDED ADS — Watch ad for hints
 # ===================================================================
 
 func load_rewarded() -> void:
-	if not _admob:
+	if not _is_android or not _initialized:
 		return
 	var unit_id: String = _get_rewarded_id()
 	if unit_id.is_empty():
 		return
-
-	if _admob.has_method("load_rewarded"):
-		_admob.load_rewarded(unit_id)
-
-	if _admob.has_signal("rewarded_ad_loaded"):
-		if not _admob.rewarded_ad_loaded.is_connected(_on_rewarded_loaded):
-			_admob.rewarded_ad_loaded.connect(_on_rewarded_loaded)
-	if _admob.has_signal("rewarded_ad_closed"):
-		if not _admob.rewarded_ad_closed.is_connected(_on_rewarded_closed):
-			_admob.rewarded_ad_closed.connect(_on_rewarded_closed)
-	if _admob.has_signal("user_earned_reward"):
-		if not _admob.user_earned_reward.is_connected(_on_reward_earned):
-			_admob.user_earned_reward.connect(_on_reward_earned)
-	if _admob.has_signal("rewarded_ad_failed_to_load"):
-		if not _admob.rewarded_ad_failed_to_load.is_connected(_on_rewarded_failed):
-			_admob.rewarded_ad_failed_to_load.connect(_on_rewarded_failed)
+		
+	_rewarded_loader = RewardedAdLoader.new()
+	_rewarded_loader.load(unit_id, AdRequest.new(), _rewarded_load_cb)
+	print("ADMOB: Loading rewarded...")
 
 func show_rewarded(on_reward: Callable = Callable()) -> void:
 	"""Show a rewarded ad. Calls on_reward if user earns the reward."""
 	_rewarded_callback = on_reward
-	if not _is_android or not _admob or not _rewarded_loaded:
+	if not _is_android or _rewarded_ad == null:
+		print("ADMOB: Rewarded ad was null, granting reward gracefully.")
 		# No ad available — grant reward for free (graceful fallback)
 		if on_reward.is_valid():
 			on_reward.call()
 		rewarded_failed.emit()
 		return
-	if _admob.has_method("show_rewarded"):
-		_admob.show_rewarded()
+
+	if is_instance_valid(_rewarded_ad):
+		var reward_listener := OnUserEarnedRewardListener.new()
+		reward_listener.on_user_earned_reward = _on_user_earned_reward
+		_rewarded_ad.show(reward_listener)
+		print("ADMOB: Showing rewarded")
 	else:
-		if on_reward.is_valid():
-			on_reward.call()
+		print("ADMOB: Rewarded ad instance invalid.")
+		_rewarded_ad = null
+		if _rewarded_callback.is_valid():
+			_rewarded_callback.call()
+		_rewarded_callback = Callable()
 		rewarded_failed.emit()
 
 func is_rewarded_ready() -> bool:
-	return _is_android and _rewarded_loaded
+	return _is_android and _rewarded_ad != null
 
-func _on_rewarded_loaded() -> void:
-	_rewarded_loaded = true
+# --- Rewarded callbacks ---
 
-func _on_reward_earned(_type: String = "", _amount: int = 0) -> void:
+func _on_rewarded_loaded(ad: RewardedAd) -> void:
+	print("ADMOB: Rewarded loaded!")
+	ad.full_screen_content_callback = _rewarded_content_cb
+	_rewarded_ad = ad
+
+func _on_rewarded_failed_to_load(error: LoadAdError) -> void:
+	print("ADMOB: Rewarded failed to load: %s" % error.message)
+	_rewarded_ad = null
+
+func _on_user_earned_reward(_item: RewardedItem) -> void:
+	print("ADMOB: User earned reward")
 	if _rewarded_callback.is_valid():
 		_rewarded_callback.call()
 	_rewarded_callback = Callable()
 	rewarded_earned.emit()
 
-func _on_rewarded_closed() -> void:
-	_rewarded_loaded = false
+func _on_rewarded_dismissed() -> void:
+	print("ADMOB: Rewarded dismissed")
+	if _rewarded_ad:
+		_rewarded_ad.destroy()
+	_rewarded_ad = null
 	_rewarded_callback = Callable()
-	# Pre-load next one
 	load_rewarded()
 
-func _on_rewarded_failed(_error_code: int = 0) -> void:
-	_rewarded_loaded = false
+func _on_rewarded_failed_to_show(_error: AdError) -> void:
+	print("ADMOB: Rewarded failed to show")
+	_rewarded_ad = null
+	if _rewarded_callback.is_valid():
+		_rewarded_callback.call()
+	_rewarded_callback = Callable()
+	rewarded_failed.emit()
+	load_rewarded()
 
 # ===================================================================
 # HELPERS
 # ===================================================================
 
 func _get_interstitial_id() -> String:
-	if not ClassDB.class_exists("AdConfig"):
-		return ""
 	if AdConfig.USE_TEST_ADS:
 		return AdConfig.TEST_INTERSTITIAL_ID
 	return AdConfig.INTERSTITIAL_ID
 
 func _get_rewarded_id() -> String:
-	if not ClassDB.class_exists("AdConfig"):
-		return ""
 	if AdConfig.USE_TEST_ADS:
 		return AdConfig.TEST_REWARDED_ID
 	return AdConfig.REWARDED_ID
-
-func _get_banner_id() -> String:
-	if not ClassDB.class_exists("AdConfig"):
-		return ""
-	if AdConfig.USE_TEST_ADS:
-		return AdConfig.TEST_BANNER_ID
-	return AdConfig.BANNER_ID

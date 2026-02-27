@@ -55,7 +55,7 @@ func transition_to_scene(scene_path: String, is_chapter_change: bool = false) ->
 	transition_midpoint.emit()
 
 	# Swap scene
-	get_tree().change_scene_to_file(scene_path)
+	get_tree().call_deferred("change_scene_to_file", scene_path)
 	await get_tree().process_frame
 	await get_tree().process_frame
 

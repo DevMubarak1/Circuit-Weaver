@@ -393,6 +393,8 @@ class _RippleRing extends Node2D:
 		_started = true
 
 	func _process(delta: float) -> void:
+		if not is_inside_tree():
+			return
 		if not _started:
 			return
 		_elapsed += delta

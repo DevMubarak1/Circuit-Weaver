@@ -44,7 +44,7 @@ func _on_initialize_button_pressed():
 	Global.user_age = architect_age
 	Global.save_progress()
 
-	get_tree().change_scene_to_file("res://scenes/level_select.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/level_select.tscn")
 
 func create_notification_panel() -> void:
 	notification_panel = PanelContainer.new()

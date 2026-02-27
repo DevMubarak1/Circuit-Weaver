@@ -203,7 +203,9 @@ func load_progress() -> void:
 
 func save_progress() -> void:
 	var config := ConfigFile.new()
-	config.load(SAVE_PATH)  # preserve existing sections (Settings, etc.)
+	var load_result = config.load(SAVE_PATH)
+	if load_result != OK and load_result != ERR_FILE_NOT_FOUND:
+		config = ConfigFile.new()  # Start fresh if load fails
 	config.set_value("Architect", "name", user_name)
 	config.set_value("Architect", "age", user_age)
 	config.set_value("Progress", "max_level_unlocked", max_level_unlocked)
@@ -212,7 +214,9 @@ func save_progress() -> void:
 	# Save achievements
 	for ach_id in achievements:
 		config.set_value("Achievements", ach_id, achievements[ach_id])
-	config.save(SAVE_PATH)
+	var err = config.save(SAVE_PATH)
+	if err != OK:
+		push_error("Failed to save progress to %s (error %d)" % [SAVE_PATH, err])
 
 func logout() -> void:
 	user_name = "Guest"
@@ -224,4 +228,6 @@ func logout() -> void:
 	achievements.clear()
 	# Delete save file
 	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(SAVE_PATH)
+		var err = DirAccess.remove_absolute(SAVE_PATH)
+		if err != OK:
+			push_error("Could not delete save file: %d" % err)
