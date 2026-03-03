@@ -625,6 +625,8 @@ func show_level_complete_panel(stars: int) -> void:
 		tw.tween_property(level_complete_panel, "modulate:a", 1.0, 0.4)
 		tw.tween_property(level_complete_panel, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		await tw.finished
+		if not is_inside_tree():
+			return
 		# Star celebration burst from center
 		var vp_size = get_viewport().get_visible_rect().size
 		var center = vp_size / 2.0
@@ -642,6 +644,8 @@ func show_level_complete_panel(stars: int) -> void:
 		var share_btn = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/ShareBtn")
 		var next_btn2 = level_complete_panel.get_node_or_null("Margin/VBox/ButtonRow/NextLevelBtn")
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		if share_btn:
 			anim.setup_button_hover(share_btn)
 		if next_btn2:
@@ -828,13 +832,10 @@ func _android_share_image(_image_path: String, caption: String) -> bool:
 		share.share_img_web(_image_path, title, caption)
 		return true
 
-	# ── Blind fallback: has_method() fails for JNISingleton ─────────────────
-	# The @UsedByGodot method IS found at JNI level even when has_method()
-	# returns false (Godot 4 engine version mismatch with plugin compile target).
-	# callv() routes directly through the JNI bridge and works correctly.
-	print("SHARE: Calling share_img('%s', '%s', caption)." % [_image_path, title])
-	share.callv("share_img", [_image_path, title, caption])
-	return true
+	# No known share method found — fall back to clipboard instead of
+	# risking a JNI crash from a blind callv() call.
+	print("SHARE: No known share method available, falling back to clipboard.")
+	return false
 
 func _share_fallback_clipboard(caption: String, share_btn: Button) -> void:
 	DisplayServer.clipboard_set(caption)

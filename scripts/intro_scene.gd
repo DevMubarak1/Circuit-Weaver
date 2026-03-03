@@ -134,6 +134,8 @@ func _build_cinematic_intro() -> void:
 
 	# Play boot sequence
 	await _play_boot_sequence(boot_texts)
+	if not is_inside_tree():
+		return
 
 	if _skip_pressed:
 		_navigate_next()
@@ -148,6 +150,8 @@ func _build_cinematic_intro() -> void:
 		tw.tween_property(_title_label, "modulate:a", 1.0, 0.7)
 		tw.tween_property(_title_label, "scale", Vector2.ONE, 0.8).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		await tw.finished
+		if not is_inside_tree():
+			return
 	else:
 		_title_label.modulate.a = 1.0
 
@@ -164,6 +168,8 @@ func _build_cinematic_intro() -> void:
 		tw_div.tween_property(divider, "modulate:a", 1.0, 0.4)
 		tw_div.tween_property(divider, "scale:x", 1.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		await tw_div.finished
+		if not is_inside_tree():
+			return
 	else:
 		divider.modulate.a = 1.0
 
@@ -176,6 +182,8 @@ func _build_cinematic_intro() -> void:
 		anim.typewriter(_subtitle_label, _subtitle_label.text, 35.0)
 		_subtitle_label.modulate.a = 1.0
 		await get_tree().create_timer(1.4).timeout
+		if not is_inside_tree():
+			return
 	else:
 		_subtitle_label.modulate.a = 1.0
 
@@ -192,6 +200,8 @@ func _build_cinematic_intro() -> void:
 		anim.glow_text(_title_label, Color(0.0, 0.9, 0.9, 1.0), 1.4)
 
 	await get_tree().create_timer(1.5).timeout
+	if not is_inside_tree():
+		return
 	_navigate_next()
 
 func _play_boot_sequence(texts: Array[String]) -> void:

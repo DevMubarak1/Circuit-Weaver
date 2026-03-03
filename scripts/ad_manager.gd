@@ -31,7 +31,7 @@ var _interstitial_loader: InterstitialAdLoader
 var _rewarded_loader: RewardedAdLoader
 
 # Frequency cap: show interstitial every N levels
-const INTERSTITIAL_FREQUENCY: int = 1
+const INTERSTITIAL_FREQUENCY: int = 3
 var _levels_since_last_ad: int = 0
 
 signal interstitial_closed
@@ -75,6 +75,17 @@ func _setup_callbacks() -> void:
 func _initialize_admob() -> void:
 	if _initialized:
 		return
+	# ── COPPA / GDPR: Child-directed treatment ──────────────────────
+	# Required because the app targets children (ages 5+).
+	# tag_for_child_directed_treatment = true  → disables interest-based ads (COPPA)
+	# tag_for_under_age_of_consent    = true  → disables personalized ads  (GDPR)
+	var config := RequestConfiguration.new()
+	config.tag_for_child_directed_treatment = RequestConfiguration.TagForChildDirectedTreatment.TRUE
+	config.tag_for_under_age_of_consent = RequestConfiguration.TagForUnderAgeOfConsent.TRUE
+	config.max_ad_content_rating = RequestConfiguration.MaxAdContentRating.G
+	MobileAds.set_request_configuration(config)
+	print("ADMOB: Set child-directed treatment + under-age-of-consent + max rating G")
+
 	var listener := OnInitializationCompleteListener.new()
 	listener.on_initialization_complete = _on_admob_initialized
 	MobileAds.initialize(listener)

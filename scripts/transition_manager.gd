@@ -51,18 +51,30 @@ func transition_to_scene(scene_path: String, is_chapter_change: bool = false) ->
 	var tween_in = create_tween()
 	tween_in.tween_method(_set_progress, 0.0, 1.0, duration)
 	await tween_in.finished
+	if not is_inside_tree():
+		_is_transitioning = false
+		return
 
 	transition_midpoint.emit()
 
 	# Swap scene
 	get_tree().call_deferred("change_scene_to_file", scene_path)
 	await get_tree().process_frame
+	if not is_inside_tree():
+		_is_transitioning = false
+		return
 	await get_tree().process_frame
+	if not is_inside_tree():
+		_is_transitioning = false
+		return
 
 	# Phase 2: Reveal new scene
 	var tween_out = create_tween()
 	tween_out.tween_method(_set_progress, 1.0, 0.0, duration)
 	await tween_out.finished
+	if not is_inside_tree():
+		_is_transitioning = false
+		return
 
 	_overlay.visible = false
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
