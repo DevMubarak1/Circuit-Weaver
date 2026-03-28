@@ -1,0 +1,3 @@
+# Circuit Weaver app-ads.txt
+# Android package: com.circuitweaver.app
+google.com, pub-7226815707316883, DIRECT, f08c47fec0942fa0
