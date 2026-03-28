@@ -51,7 +51,9 @@ export default function Navbar() {
             </Link>
           ))}
           <Link
-            href="/play"
+            href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
+            target="_blank"
+            rel="noopener noreferrer"
             className="ml-4 px-6 py-2 font-mono text-sm tracking-wider bg-cyan/10 border border-cyan/30 text-cyan rounded-lg hover:bg-cyan/20 hover:border-cyan/60 transition-all duration-300 glow-cyan flex items-center gap-2"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>PLAY NOW
@@ -99,7 +101,9 @@ export default function Navbar() {
                 </Link>
               ))}
               <Link
-                href="/play"
+                href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => setMobileOpen(false)}
                 className="mt-2 text-center px-6 py-3 font-mono text-sm tracking-wider bg-cyan/10 border border-cyan/30 text-cyan rounded-lg flex items-center justify-center gap-2"
               >

@@ -2,6 +2,7 @@ extends Node
 
 var user_name: String = "Guest"
 var user_age: int = 0
+var is_child: bool = true  # Default to child-safe until age screen confirms otherwise
 var current_level: int = 1
 var current_level_score: int = 0  # 0-3 stars
 var max_level_unlocked: int = 1
@@ -190,6 +191,7 @@ func load_progress() -> void:
 		return
 	user_name = config.get_value("Architect", "name", "Guest")
 	user_age = config.get_value("Architect", "age", 0)
+	is_child = config.get_value("Architect", "is_child", true)
 	max_level_unlocked = config.get_value("Progress", "max_level_unlocked", 1)
 	for i in range(1, 21):
 		var score: int = config.get_value("Progress", "level_%d_score" % i, 0)
@@ -208,6 +210,7 @@ func save_progress() -> void:
 		config = ConfigFile.new()  # Start fresh if load fails
 	config.set_value("Architect", "name", user_name)
 	config.set_value("Architect", "age", user_age)
+	config.set_value("Architect", "is_child", is_child)
 	config.set_value("Progress", "max_level_unlocked", max_level_unlocked)
 	for level_id in level_scores:
 		config.set_value("Progress", "level_%d_score" % level_id, level_scores[level_id])
@@ -221,6 +224,7 @@ func save_progress() -> void:
 func logout() -> void:
 	user_name = "Guest"
 	user_age = 0
+	is_child = true
 	current_level = 1
 	current_level_score = 0
 	max_level_unlocked = 1

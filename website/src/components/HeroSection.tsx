@@ -81,7 +81,9 @@ export default function HeroSection() {
               className="flex flex-col sm:flex-row gap-3 sm:gap-4"
             >
               <Link
-                href="/play"
+                href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group relative inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 font-mono text-xs sm:text-sm tracking-widest rounded-xl overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan to-sapphire transition-all duration-300 group-hover:scale-[1.02]" />

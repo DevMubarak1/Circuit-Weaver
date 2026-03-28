@@ -1,12 +1,19 @@
 extends Control
 
-# Use scene unique names (%) with fallback for robust node access
+# Use scene unique names (%) for the new DOB-based age screen
 @onready var name_edit = get_node_or_null("%NameEdit")
-@onready var age_spin = get_node_or_null("%AgeSpin")
+@onready var month_option: OptionButton = get_node_or_null("%MonthOption")
+@onready var day_option: OptionButton = get_node_or_null("%DayOption")
+@onready var year_option: OptionButton = get_node_or_null("%YearOption")
 @onready var button = get_node_or_null("%Button")
 
 var notification_panel: PanelContainer
 var notification_label: Label
+
+const MONTHS := [
+	"Month", "January", "February", "March", "April", "May", "June",
+	"July", "August", "September", "October", "November", "December"
+]
 
 func _ready():
 	await get_tree().process_frame
@@ -15,6 +22,7 @@ func _ready():
 	ThemeManager.create_aurora_bg(self)
 
 	create_notification_panel()
+	_populate_dob_dropdowns()
 	_apply_responsive_layout()
 	apply_profile_styling()
 	
@@ -24,13 +32,46 @@ func _ready():
 	# Entrance animations
 	_animate_entrance()
 
+func _populate_dob_dropdowns() -> void:
+	# --- MONTH ---
+	if month_option:
+		month_option.clear()
+		for i in range(MONTHS.size()):
+			month_option.add_item(MONTHS[i], i)
+		month_option.selected = 0  # "Month" placeholder
+
+	# --- DAY ---
+	if day_option:
+		day_option.clear()
+		day_option.add_item("Day", 0)  # Placeholder
+		for d in range(1, 32):
+			day_option.add_item(str(d), d)
+		day_option.selected = 0
+
+	# --- YEAR ---
+	if year_option:
+		year_option.clear()
+		year_option.add_item("Year", 0)  # Placeholder — no preset!
+		var current_year: int = Time.get_date_dict_from_system()["year"]
+		# Show years from current year down to 1920 — completely neutral
+		for y in range(current_year, 1919, -1):
+			year_option.add_item(str(y), y)
+		year_option.selected = 0
+
+func _calculate_age_from_dob(year: int, month: int, day: int) -> int:
+	var now: Dictionary = Time.get_date_dict_from_system()
+	var age: int = now["year"] - year
+	# If birthday hasn't happened yet this year, subtract 1
+	if now["month"] < month or (now["month"] == month and now["day"] < day):
+		age -= 1
+	return age
+
 func _on_initialize_button_pressed():
-	if not name_edit or not age_spin:
+	if not name_edit or not month_option or not day_option or not year_option:
 		show_notification("Error: UI components missing!", 2.0)
 		return
 	
 	var architect_name = name_edit.text.strip_edges()
-	var architect_age = int(age_spin.value)
 	
 	if architect_name == "":
 		show_notification("Architect Identification Required. Please enter a name.", 2.5)
@@ -39,9 +80,37 @@ func _on_initialize_button_pressed():
 	if architect_name.length() < 3:
 		show_notification("Minimum 3 characters required.", 2.5)
 		return
-	
+
+	# Validate DOB selections (index 0 = placeholder for all three)
+	var month_idx: int = month_option.selected
+	var day_idx: int = day_option.selected
+	var year_idx: int = year_option.selected
+
+	if month_idx == 0 or day_idx == 0 or year_idx == 0:
+		show_notification("Please select your full date of birth.", 2.5)
+		return
+
+	var sel_month: int = month_idx  # 1-12
+	var sel_day: int = day_option.get_item_id(day_idx)
+	var sel_year: int = year_option.get_item_id(year_idx)
+
+	# Basic date validity
+	if sel_day > 30 and sel_month in [4, 6, 9, 11]:
+		show_notification("Invalid date — that month has only 30 days.", 2.5)
+		return
+	if sel_month == 2 and sel_day > 29:
+		show_notification("Invalid date — February has at most 29 days.", 2.5)
+		return
+
+	var architect_age: int = _calculate_age_from_dob(sel_year, sel_month, sel_day)
+
+	if architect_age < 0 or architect_age > 120:
+		show_notification("Please enter a valid date of birth.", 2.5)
+		return
+
 	Global.user_name = architect_name
 	Global.user_age = architect_age
+	Global.is_child = architect_age < 13
 	Global.save_progress()
 
 	get_tree().call_deferred("change_scene_to_file", "res://scenes/level_select.tscn")
@@ -101,13 +170,18 @@ func show_notification(message: String, duration: float = 2.0) -> void:
 		tw.tween_property(notification_panel, "position:y", 20.0, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(notification_panel, "modulate:a", 1.0, 0.2)
 		await tw.finished
+		if not is_inside_tree():
+			return
 		await get_tree().create_timer(duration).timeout
+		if not is_inside_tree():
+			return
 		var tw_out = notification_panel.create_tween()
 		tw_out.tween_property(notification_panel, "modulate:a", 0.0, 0.3)
 		await tw_out.finished
 	else:
 		await get_tree().create_timer(duration).timeout
-	notification_panel.visible = false
+	if is_inside_tree() and is_instance_valid(notification_panel):
+		notification_panel.visible = false
 
 func apply_profile_styling():
 	# Guard against multiple styling passes
@@ -129,8 +203,13 @@ func apply_profile_styling():
 	if name_edit:
 		ThemeManager.apply_input_style(name_edit, ThemeManager.SIGNAL_ACTIVE)
 	
-	if age_spin:
-		ThemeManager.apply_input_style(age_spin, ThemeManager.SIGNAL_ACTIVE)
+	# Style DOB dropdowns
+	if month_option:
+		ThemeManager.apply_input_style(month_option, ThemeManager.SIGNAL_ACTIVE)
+	if day_option:
+		ThemeManager.apply_input_style(day_option, ThemeManager.SIGNAL_ACTIVE)
+	if year_option:
+		ThemeManager.apply_input_style(year_option, ThemeManager.SIGNAL_ACTIVE)
 	
 	if button:
 		ThemeManager.apply_button_style(button, ThemeManager.SIGNAL_ACTIVE)
@@ -165,8 +244,15 @@ func _apply_responsive_layout() -> void:
 	if name_edit:
 		name_edit.custom_minimum_size.y = 45.0 * ui_scale
 		name_edit.add_theme_font_size_override("font_size", int(16.0 * ui_scale))
-	if age_spin:
-		age_spin.custom_minimum_size.y = 45.0 * ui_scale
+
+	# Responsive DOB dropdowns
+	var dob_font: int = int(14.0 * ui_scale)
+	var dob_height: float = 45.0 * ui_scale
+	for opt in [month_option, day_option, year_option]:
+		if opt:
+			opt.custom_minimum_size.y = dob_height
+			opt.add_theme_font_size_override("font_size", dob_font)
+
 	if button:
 		button.custom_minimum_size.y = 55.0 * ui_scale
 		button.add_theme_font_size_override("font_size", int(16.0 * ui_scale))

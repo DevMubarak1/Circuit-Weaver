@@ -77,14 +77,15 @@ func _initialize_admob() -> void:
 		return
 	# ── COPPA / GDPR: Child-directed treatment ──────────────────────
 	# Required because the app targets children (ages 5+).
-	# tag_for_child_directed_treatment = true  → disables interest-based ads (COPPA)
-	# tag_for_under_age_of_consent    = true  → disables personalized ads  (GDPR)
+	# tag_for_child_directed_treatment = TRUE  → disables interest-based ads (COPPA)
+	# tag_for_under_age_of_consent    = TRUE  → disables personalized ads  (GDPR)
+	# max_ad_content_rating = "G"              → only G-rated ad content
 	var config := RequestConfiguration.new()
 	config.tag_for_child_directed_treatment = RequestConfiguration.TagForChildDirectedTreatment.TRUE
 	config.tag_for_under_age_of_consent = RequestConfiguration.TagForUnderAgeOfConsent.TRUE
-	config.max_ad_content_rating = RequestConfiguration.MaxAdContentRating.G
+	config.max_ad_content_rating = RequestConfiguration.MAX_AD_CONTENT_RATING_G
 	MobileAds.set_request_configuration(config)
-	print("ADMOB: Set child-directed treatment + under-age-of-consent + max rating G")
+	print("ADMOB: Set child-directed + under-age-of-consent + max rating G")
 
 	var listener := OnInitializationCompleteListener.new()
 	listener.on_initialization_complete = _on_admob_initialized

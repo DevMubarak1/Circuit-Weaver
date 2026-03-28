@@ -89,14 +89,31 @@ theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Center/MainPanel/Margins/VBox/AgeSection"]
 layout_mode = 2
-text = "BIOLOGICAL CYCLE (AGE)"
+text = "DATE OF BIRTH"
 
-[node name="AgeSpin" type="SpinBox" parent="Center/MainPanel/Margins/VBox/AgeSection"]
+[node name="DOBContainer" type="HBoxContainer" parent="Center/MainPanel/Margins/VBox/AgeSection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MonthOption" type="OptionButton" parent="Center/MainPanel/Margins/VBox/AgeSection/DOBContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 45)
 layout_mode = 2
-min_value = 1.0
-value = 18.0
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="DayOption" type="OptionButton" parent="Center/MainPanel/Margins/VBox/AgeSection/DOBContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="YearOption" type="OptionButton" parent="Center/MainPanel/Margins/VBox/AgeSection/DOBContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+size_flags_horizontal = 3
 alignment = 1
 
 [node name="Spacer" type="Control" parent="Center/MainPanel/Margins/VBox"]

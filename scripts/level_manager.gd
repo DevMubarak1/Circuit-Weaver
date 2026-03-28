@@ -166,11 +166,13 @@ func load_architect_profile() -> void:
 		if err == OK:
 			Global.user_name = config.get_value("Architect", "name", "Guest")
 			Global.user_age = config.get_value("Architect", "age", 0)
+			Global.is_child = config.get_value("Architect", "is_child", true)
 		else:
 			Global.user_name = "Guest"
 			Global.user_age = 0
+			Global.is_child = true
 	
-	welcome_label.text = "WELCOME, ARCHITECT %s (AGE %d)" % [Global.user_name.to_upper(), Global.user_age]
+	welcome_label.text = "WELCOME, ARCHITECT %s" % [Global.user_name.to_upper()]
 	header_label.text = "CIRCUIT WEAVER - LEVEL %d" % current_level_id
 
 func apply_level_theme() -> void:

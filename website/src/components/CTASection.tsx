@@ -37,7 +37,9 @@ export default function CTASection() {
         <BlurFadeIn delay={0.5}>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Link
-              href="/play"
+              href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group relative inline-flex items-center justify-center px-8 sm:px-10 py-3.5 sm:py-4 font-mono text-xs sm:text-sm tracking-widest rounded-xl overflow-hidden w-full sm:w-auto"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-cyan via-sapphire to-violet transition-all duration-300 group-hover:scale-[1.02]" />
@@ -45,8 +47,9 @@ export default function CTASection() {
               <span className="relative text-midnight font-bold flex items-center gap-2"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>PLAY NOW</span>
             </Link>
             <Link
-              href="https://play.google.com/store"
+              href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
               target="_blank"
+              rel="noopener noreferrer"
               className="group inline-flex items-center gap-3 px-5 sm:px-6 py-2.5 sm:py-3 bg-white/[0.04] border border-foreground/10 rounded-xl hover:border-foreground/20 hover:bg-white/[0.07] transition-all duration-300 w-full sm:w-auto justify-center"
             >
               <svg className="w-7 h-7 shrink-0" viewBox="0 0 24 24">
