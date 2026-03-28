@@ -81,14 +81,29 @@ export default function HeroSection() {
               className="flex flex-col sm:flex-row gap-3 sm:gap-4"
             >
               <Link
-                href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/play"
                 className="group relative inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 font-mono text-xs sm:text-sm tracking-widest rounded-xl overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan to-sapphire transition-all duration-300 group-hover:scale-[1.02]" />
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan to-sapphire opacity-0 group-hover:opacity-30 blur-xl transition-opacity duration-300" />
                 <span className="relative text-midnight font-bold flex items-center gap-2"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>PLAY IN BROWSER</span>
+              </Link>
+              <Link
+                href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-3 px-5 sm:px-6 py-2.5 sm:py-3 bg-white/[0.04] border border-foreground/10 rounded-xl hover:border-foreground/20 hover:bg-white/[0.07] transition-all duration-300 justify-center"
+              >
+                <svg className="w-7 h-7 shrink-0" viewBox="0 0 24 24">
+                  <path d="M3.607 1.818L13.6 12l-9.994 10.182a.996.996 0 0 1-.606-.916V2.734a.996.996 0 0 1 .607-.916z" fill="#4AAEFE"/>
+                  <path d="M13.6 12L3.607 1.818l11.196 6.467L13.6 12z" fill="#43D66C"/>
+                  <path d="M3.607 22.182L13.6 12l1.204 3.715L3.607 22.182z" fill="#F33E52"/>
+                  <path d="M20.927 10.571l-6.124-3.286L13.6 12l1.204 3.715 6.123-3.414a1 1 0 0 0 0-1.73z" fill="#FFC801"/>
+                </svg>
+                <div className="flex flex-col items-start leading-tight">
+                  <span className="text-[9px] sm:text-[10px] tracking-[0.15em] text-foreground/30 uppercase font-sans">GET IT ON</span>
+                  <span className="text-base sm:text-lg font-semibold text-foreground/70 group-hover:text-foreground/90 transition-colors -mt-0.5">Google Play</span>
+                </div>
               </Link>
               <Link
                 href="https://github.com/DevMubarak1/Circuit-Weaver"

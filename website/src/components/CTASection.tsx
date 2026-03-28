@@ -37,9 +37,7 @@ export default function CTASection() {
         <BlurFadeIn delay={0.5}>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Link
-              href="https://play.google.com/store/apps/details?id=com.circuitweaver.app"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/play"
               className="group relative inline-flex items-center justify-center px-8 sm:px-10 py-3.5 sm:py-4 font-mono text-xs sm:text-sm tracking-widest rounded-xl overflow-hidden w-full sm:w-auto"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-cyan via-sapphire to-violet transition-all duration-300 group-hover:scale-[1.02]" />
